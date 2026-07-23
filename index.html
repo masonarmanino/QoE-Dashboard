@@ -549,11 +549,11 @@ function renderRevenueTables(){
 
 function lastNumericValue(row){
   if (!Array.isArray(row)) return NaN;
-  for (let i = row.length - 1; i >= 0; i--){
-    const value = Number(row[i]);
-    if (Number.isFinite(value)) return value;
-  }
-  return NaN;
+  const values = row.map(cell => Number(cell)).filter(Number.isFinite);
+  if (values.length === 0) return NaN;
+  const largeNumbers = values.filter(v => Math.abs(v) >= 1000);
+  if (largeNumbers.length) return largeNumbers[largeNumbers.length - 1];
+  return values[values.length - 1];
 }
 
 function lookupRowValue(sheetData, labels){
@@ -707,16 +707,24 @@ function renderCommonSize(){
   }
   hideSectionMessage(sectionId);
   const items = [];
-  const categories = ['labor - dvm', 'labor - staff', 'labor & fringe', 'facility & equip', 'admin', 'fee/collection', 'marketing'];
+  const categories = [
+    {key:'labor - dvm', label:'Labor - DVM'},
+    {key:'labor - staff', label:'Labor - Staff'},
+    {key:'labor & fringe', label:'Labor & Fringe'},
+    {key:'facility & equip', label:'Facility & Equip'},
+    {key:'admin', label:'Administrative'},
+    {key:'fee income collection', label:'Fee Income & Collection'},
+    {key:'marketing', label:'Marketing'}
+  ];
   categories.forEach(cat => {
-    const row = data.rows.find(r => normalizeKey(r[0] || '').includes(cat));
+    const row = data.rows.find(r => normalizeKey(r[0] || '').includes(normalizeKey(cat.key)));
     if (row){
       items.push({
-        label: row[0] || cat,
+        label: row[0] || cat.label,
         firstLabel: 'Company %',
-        firstValue: row[1] || '-',
+        firstValue: formatPercentValue(Number(row[1])),
         secondLabel: 'Peer Avg %',
-        secondValue: row[2] || '-'
+        secondValue: formatPercentValue(Number(row[2]))
       });
     }
   });
@@ -793,7 +801,17 @@ function setUploadError(message){
 }
 
 function normalizeKey(value){
-  return String(value || '').trim().toLowerCase();
+  return String(value || '')
+    .replace(/&amp;/gi, '&')
+    .replace(/<[^>]+>/g, '')
+    .replace(/[^a-z0-9]+/gi, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function formatPercentValue(value){
+  if (!Number.isFinite(value)) return '-';
+  return formatPercent(value * 100, 1);
 }
 
 function getCellValue(sheet, row, col){
@@ -854,7 +872,7 @@ function parseSectionByCols(rows, startIndex, colIndexes){
   return section;
 }
 
-function parseSheetTable(sheet, headerPredicate){
+function parseSheetTable(sheet, headerPredicate, options={}){
   if (!sheet) return null;
   const rows = sheetToRows(sheet);
   const headerIndex = rows.findIndex(headerPredicate);
@@ -863,7 +881,10 @@ function parseSheetTable(sheet, headerPredicate){
   const dataRows = [];
   for (let i = headerIndex + 1; i < rows.length; i++){
     const row = rows[i];
-    if (!Array.isArray(row) || row.every(cell => cell === undefined || cell === '')) break;
+    if (!Array.isArray(row) || row.every(cell => cell === undefined || cell === '')) {
+      if (options.skipEmptyRows) continue;
+      break;
+    }
     if (!row[0]) continue;
     dataRows.push(row.map(cell => String(cell === undefined || cell === null ? '' : cell)));
   }
@@ -879,7 +900,7 @@ function parseEbitdaAnalysis(sheet){
 }
 
 function parsePayrollAnalysis(sheet){
-  return parseSheetTable(sheet, row => Array.isArray(row) && (normalizeKey(row[0]) === 'staff employees' || normalizeKey(row[0]) === 'owner / dvm'));
+  return parseSheetTable(sheet, row => Array.isArray(row) && normalizeKey(row[0]) === 'staff employees', {skipEmptyRows:true});
 }
 
 function parseCommonSizeAnalysis(sheet){
