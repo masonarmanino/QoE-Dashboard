@@ -60,6 +60,8 @@
   .metric-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;font-weight:700;}
   .metric-value{font-size:24px;font-weight:700;color:var(--ink);line-height:1.1;}
   .metric-note{font-size:12px;color:var(--muted);margin-top:8px;}
+  .status-chip{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:700;padding:8px 10px;border-radius:999px;background:#eef6e6;color:#285d25;}
+  .status-chip.warning{background:#fff3d6;color:#7b5b00;}
   .metric-pair{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;font-size:13px;}
   .metric-pair div{background:#f7f7f4;border-radius:10px;padding:10px;}
   .metric-pair .pair-label{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;}
@@ -72,15 +74,28 @@
   .upload-zone.dragover{background:#fffbe4;border-color:var(--gold);}
   .upload-zone div{font-size:16px;color:var(--ink);}
   .upload-actions{display:flex;justify-content:center;align-items:center;gap:14px;margin-top:22px;flex-wrap:wrap;}
-  .btn{border:none;border-radius:999px;padding:12px 18px;font-weight:600;cursor:pointer;}
+  .btn{border:none;border-radius:999px;padding:12px 18px;font-weight:600;cursor:pointer;font-family:inherit;}
   .btn-primary{background:var(--gold);color:var(--ink);}
+  .btn-secondary{background:var(--ink);color:#fff;}
   .btn-reset{background:none;color:var(--ink);border:1px solid var(--line);padding:8px 14px;border-radius:999px;font-size:13px;}
   .upload-hint{font-size:12px;color:var(--muted);}
   .upload-error{margin-top:18px;padding:14px 18px;border:1px solid #E0B966;background:#FFF4CC;color:#5F4B00;border-radius:12px;text-align:left;font-size:13px;}
   .no-data-message{margin-bottom:18px;padding:16px 18px;border:1px solid #E0B966;background:#fff8e8;color:#5F4B00;border-radius:12px;font-size:13px;}
-  .dashboard-top{max-width:1200px;margin:0 auto;padding:18px 28px;display:flex;justify-content:flex-end;}
+  .dashboard-top{max-width:1200px;margin:0 auto;padding:18px 28px;display:flex;justify-content:flex-end;gap:12px;}
+  .print-only{display:none;}
   .hide{display:none;}
   svg{width:100%;height:auto;display:block;}
+  @media print {
+    body{background:#fff;color:#000;}
+    header, .dashboard-top, nav, .upload-state, .btn, input, .upload-error, .upload-actions, .upload-zone, .upload-hint{display:none !important;}
+    main{padding:18px 14px 60px;}
+    .card{box-shadow:none;border-color:#bbb;}
+    .grid, .sheet-summary{display:block;}
+    section{page-break-inside:avoid;break-inside:avoid;}
+    .card{page-break-inside:avoid;}
+    .print-footer{display:block;margin-top:20px;padding-top:12px;border-top:1px solid #ddd;color:#333;font-size:12px;}
+    footer{display:none;}
+  }
   .axis{stroke:var(--line);stroke-width:1;}
   .gl{stroke:#EFEFE9;stroke-width:1;}
   .tl{fill:var(--muted);font-size:11px;}
@@ -104,13 +119,22 @@
 
 <section id="uploadState" class="upload-state">
   <div class="card upload-card">
-    <h2>Upload dashboard data</h2>
+    <div class="brand" style="justify-content:center;display:flex;align-items:center;gap:12px;margin-bottom:18px;">
+      <div class="mark" style="display:flex;gap:3px;">
+        <span class="t-gold"></span><span class="t-olive"></span><span class="t-ink"></span>
+      </div>
+      <div style="text-align:left;">
+        <h2 style="margin:0;font-size:22px;">Armanino QofE Dashboard</h2>
+        <small style="color:var(--muted);font-size:13px;">Upload a workbook to populate the dashboard.</small>
+      </div>
+    </div>
     <p>Drag and drop a <strong>.xlsx</strong> file here, or browse to select one.</p>
     <div id="uploadArea" class="upload-zone">
       <div>Drop your Excel workbook here</div>
     </div>
     <div class="upload-actions">
       <button id="browseFile" class="btn btn-primary" type="button">Browse for .xlsx</button>
+      <button id="loadSample" class="btn btn-secondary" type="button">Load sample data</button>
       <div class="upload-hint">Offline workbook upload only.</div>
     </div>
     <div id="uploadError" class="upload-error hide" role="alert"></div>
@@ -119,11 +143,12 @@
 </section>
 
 <div id="dashboard" class="hide">
-  <div class="dashboard-top"><button id="resetFile" class="btn-reset" type="button">Load different file</button></div>
+  <div class="dashboard-top"><button id="resetFile" class="btn-reset" type="button">Load different file</button><button id="printDashboard" class="btn btn-secondary" type="button">Print / Save PDF</button></div>
   <nav>
     <button class="active" data-tab="overview">Overview</button>
     <button data-tab="bridge">EBITDA Bridge</button>
     <button data-tab="revenue">Revenue &amp; Margin</button>
+    <button data-tab="reconciliations">Reconciliations</button>
     <button data-tab="sga">SG&amp;A</button>
     <button data-tab="monthly-is">Monthly IS</button>
     <button data-tab="ebitda-analysis">EBITDA Analysis</button>
@@ -163,11 +188,16 @@
 
   <!-- REVENUE -->
   <section id="revenue" class="hide">
-    <div class="card full"><h3>Revenue &amp; Gross Profit</h3><div class="cap">Period comparison · $ actuals</div><div id="cRev"></div></div>
+    <div class="card full"><h3>Revenue, Gross Profit &amp; Margin</h3><div class="cap">Monthly revenue bars with margin line</div><div id="cRev"></div></div>
     <div class="grid" style="margin-top:18px">
       <div class="card"><h3>Revenue</h3><table><tbody id="revSummaryBody"></tbody></table></div>
       <div class="card"><h3>Cost of Products / Gross Profit</h3><table><tbody id="revMarginBody"></tbody></table></div>
     </div>
+  </section>
+
+  <!-- RECONCILIATIONS -->
+  <section id="reconciliations" class="hide">
+    <div class="sheet-summary" id="reconciliationCards"></div>
   </section>
 
   <!-- SG&A -->
@@ -199,9 +229,9 @@
 
 <footer>
   Prototype dashboard generated from uploaded dashboard data · Armanino Transaction Advisory ·
-  Illustrative only — figures shown for concept demonstration.</footer>
-
-<script src="vendor/xlsx.full.min.js"></script>
+  Illustrative only — figures shown for concept demonstration.
+  <div id="printFooter" class="print-only"></div>
+  </footer>
 <script>
 /* Self-contained SVG charting — no external libraries, loads offline & inside SharePoint/Teams */
 const GOLD='#F4A831', OLIVE='#898A38', INK='#222222', NEG='#C0532B', GREY='#CFCEC4';
@@ -222,11 +252,26 @@ function formatPercent(value, decimals=1){
   return value.toFixed(decimals) + '%';
 }
 
+function parseNumericValue(value){
+  if (value === null || value === undefined) return NaN;
+  const raw = String(value).trim();
+  if (!raw) return NaN;
+  const cleaned = raw.replace(/,/g, '').replace(/\s+/g, '');
+  if (cleaned.endsWith('%')){
+    const n = Number(cleaned.slice(0, -1));
+    return Number.isFinite(n) ? n / 100 : NaN;
+  }
+  return Number(cleaned);
+}
+
 function frame(id,w,h,pad){
   const box=document.getElementById(id);
-  const svg=el('svg',{viewBox:`0 0 ${w} ${h}`});
+  const width = box ? Math.max(w, box.clientWidth) : w;
+  const svg=el('svg',{viewBox:`0 0 ${width} ${h}`, preserveAspectRatio:'xMidYMid meet'});
+  svg.setAttribute('width','100%');
+  svg.setAttribute('height','auto');
   box.appendChild(svg);
-  return {svg,w,h,pad};
+  return {svg,w:width,h,pad};
 }
 function text(svg,x,y,s,cls,anchor){const t=el('text',{x,y,class:cls||'tl','text-anchor':anchor||'middle'});t.textContent=s;svg.appendChild(t);}
 
@@ -398,35 +443,63 @@ function groupedBars(){
     return;
   }
   hideSectionMessage('revenue');
-  const f=frame('cRev',900,320,{l:60,r:20,t:16,b:40});
+  const f=frame('cRev',900,360,{l:54,r:20,t:16,b:48});
   const {svg,w,h,pad}=f;
   const pyLabel = dashData.meta.periodPY || 'PY';
   const cyLabel = dashData.meta.periodCY || 'CY';
-  const rev = [revenue.pyValue, revenue.cyValue];
-  const gp = [grossProfit.pyValue, grossProfit.cyValue];
-  const cats = [pyLabel, cyLabel];
-  const maxVal = Math.max(...rev, ...gp, 1);
+  const months = dashData.marginSeries || [];
+  const revenueSeries = dashData.revenueSeries && dashData.revenueSeries.length === months.length ? dashData.revenueSeries : [];
+  const labels = months.map(row => row.month);
+  const marginValues = months.map(row => Number(row.value)).filter(v => Number.isFinite(v));
+  const revenueValues = revenueSeries.map(row => Number(row.value)).filter(v => Number.isFinite(v));
+  const maxRevenue = Math.max(...revenueValues, 1);
+  const maxMargin = Math.max(...marginValues, 0.1);
+  const maxVal = Math.max(maxRevenue, revenueValues[0] || 1);
   const X = w - pad.l - pad.r, Y = h - pad.t - pad.b;
-  const sy = v => pad.t + Y - (v / maxVal) * Y;
+  const sx = i => pad.l + X * i / Math.max(1, labels.length - 1);
+  const syRevenue = v => pad.t + Y - (v / maxVal) * Y;
+  const syMargin = v => pad.t + Y - ((v / Math.max(1, maxMargin)) * Y * 0.9);
 
   for(let g=0; g<=4; g++){
     const v = maxVal * g / 4;
-    const y = sy(v);
+    const y = syRevenue(v);
     svg.appendChild(el('line',{x1:pad.l,y1:y,x2:w-pad.r,y2:y,class:'gl'}));
     text(svg,pad.l-6,y+3,formatCurrency(v),'vl','end');
   }
 
-  const gw = X / cats.length;
-  const bw = gw * 0.3;
-  cats.forEach((label,i)=>{
-    const cx = pad.l + gw * i + gw/2;
-    svg.appendChild(el('rect',{x:cx-bw-4,y:sy(rev[i]),width:bw,height:Y-(sy(rev[i])-pad.t),rx:3,fill:INK}));
-    svg.appendChild(el('rect',{x:cx+4,y:sy(gp[i]),width:bw,height:Y-(sy(gp[i])-pad.t),rx:3,fill:GOLD}));
-    text(svg,cx,h-pad.b+18,label,'tl');
+  for(let g=0; g<=4; g++){
+    const v = maxMargin * g / 4;
+    const y = syMargin(v);
+    svg.appendChild(el('line',{x1:pad.l,y1:y,x2:w-pad.r,y2:y,class:'gl',opacity:'0.35'}));
+    text(svg,w-pad.r+10,y+3,formatPercent(v),'vl','start');
+  }
+
+  const barWidth = X / Math.max(1, labels.length) * 0.42;
+  labels.forEach((label,i)=>{
+    const x = sx(i) - barWidth/2;
+    const revenue = revenueSeries[i] ? Number(revenueSeries[i].value) : NaN;
+    if (Number.isFinite(revenue)){
+      svg.appendChild(el('rect',{x,y:syRevenue(revenue),width:barWidth,height:Math.max(3,Y-(syRevenue(revenue)-pad.t)),rx:4,fill:INK}));
+    }
+    const margin = Number(months[i].value);
+    if (Number.isFinite(margin)){
+      const cx = sx(i);
+      const cy = syMargin(margin);
+      if (i === 0) svg.appendChild(el('path',{d:`M${cx} ${cy}`,fill:'none'}));
+      if (i > 0){
+        const prev = Number(months[i-1].value);
+        if (Number.isFinite(prev)){
+          svg.appendChild(el('line',{x1:sx(i-1),y1:syMargin(prev),x2:cx,y2:cy,stroke:GOLD,'stroke-width':'2.5'}));
+        }
+      }
+      svg.appendChild(el('circle',{cx,cy,r:4,fill:OLIVE,stroke:'#fff','stroke-width':'1.5'}));
+    }
+    text(svg,sx(i),h-pad.b+18,label,'tl');
   });
-  const lg = document.createElement('div'); lg.className='legend';
-  lg.innerHTML = '<span><i style="background:'+INK+'"></i>Revenue</span><span><i style="background:'+GOLD+'"></i>Gross Profit</span>';
-  document.getElementById('cRev').appendChild(lg);
+
+  const legend = document.createElement('div'); legend.className='legend';
+  legend.innerHTML = `<span><i style="background:${INK}"></i>Revenue</span><span><i style="background:${GOLD}"></i>Margin %</span>`;
+  document.getElementById('cRev').appendChild(legend);
 }
 
 function donut(){
@@ -498,6 +571,10 @@ function renderKpis(){
   document.getElementById('kpiMarginSub').textContent = `${formatPercent(dashData.kpis.adjEbitdaMargin.pyValue)} in ${py}`;
   document.getElementById('kpiMultipleValue').textContent = dashData.kpis.impliedMultiple.cyValue.toFixed(1) + 'x';
   document.getElementById('kpiMultipleSub').textContent = `on ${formatCurrency(dashData.meta.purchasePrice)} cash purchase price`;
+  const printFooter = document.getElementById('printFooter');
+  if (printFooter) {
+    printFooter.textContent = `${dashData.meta.clientName} · ${dashData.meta.periodPY} / ${dashData.meta.periodCY}`;
+  }
 }
 
 function renderKeyFindings(){
@@ -697,44 +774,82 @@ function renderPayroll(){
   container.appendChild(buildMetricCards(metrics));
 }
 
+function renderReconciliations(){
+  const sectionId = 'reconciliations';
+  const containerId = 'reconciliationCards';
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  const rows = Array.isArray(dashData.reconciliations) ? dashData.reconciliations : [];
+  if (!rows.length){
+    showSectionMessage(sectionId, 'Reconciliations section is unavailable.');
+    return;
+  }
+  hideSectionMessage(sectionId);
+  rows.forEach(row => {
+    const card = document.createElement('div');
+    card.className = 'metric-card';
+    const label = document.createElement('div');
+    label.className = 'metric-label';
+    label.textContent = row.name || 'Unnamed reconciliation';
+    const status = document.createElement('div');
+    const isOk = Number(row.variance) === 0;
+    status.className = 'status-chip' + (isOk ? '' : ' warning');
+    status.innerHTML = isOk ? '✓ Within tolerance' : '⚠ ' + formatCurrency(row.variance);
+    card.appendChild(label);
+    card.appendChild(status);
+    container.appendChild(card);
+  });
+}
+
 function renderCommonSize(){
   const sectionId = 'common-size';
   const containerId = 'commonSizeContent';
   const data = dashData.commonSize;
-  if (!data){
+  if (!data || !Array.isArray(data) || data.length === 0){
     showSectionMessage(sectionId, 'Common Size Analysis data is unavailable.');
     return;
   }
   hideSectionMessage(sectionId);
-  const items = [];
-  const categories = [
-    {key:'labor - dvm', label:'Labor - DVM'},
-    {key:'labor - staff', label:'Labor - Staff'},
-    {key:'labor & fringe', label:'Labor & Fringe'},
-    {key:'facility & equip', label:'Facility & Equip'},
-    {key:'admin', label:'Administrative'},
-    {key:'fee income collection', label:'Fee Income & Collection'},
-    {key:'marketing', label:'Marketing'}
-  ];
-  categories.forEach(cat => {
-    const row = data.rows.find(r => normalizeKey(r[0] || '').includes(normalizeKey(cat.key)));
-    if (row){
-      items.push({
-        label: row[0] || cat.label,
-        firstLabel: 'Company %',
-        firstValue: formatPercentValue(Number(row[1])),
-        secondLabel: 'Peer Avg %',
-        secondValue: formatPercentValue(Number(row[2]))
-      });
-    }
-  });
+  const items = data.map(row => ({
+    category: row.category || '',
+    companyPct: Number(row.companyPct),
+    peerPct: Number(row.peerPct)
+  })).filter(row => row.category && Number.isFinite(row.companyPct) && Number.isFinite(row.peerPct));
   const container = document.getElementById(containerId);
   container.innerHTML = '';
   if (!items.length){
-    container.appendChild(buildSheetTable(data));
+    showSectionMessage(sectionId, 'Common Size Analysis section includes no valid category rows.');
     return;
   }
-  container.appendChild(buildComparisonCards(items));
+
+  const f = frame(containerId, 900, Math.max(320, items.length * 40 + 80), {l:180, r:20, t:24, b:40});
+  const {svg,w,h,pad} = f;
+  const Y = h - pad.t - pad.b;
+  const bh = Y / items.length * 0.5;
+  const gap = Y / items.length;
+  const maxPct = Math.max(...items.flatMap(item => [item.companyPct, item.peerPct, 0.1]));
+  const sx = v => pad.l + (v / maxPct) * (w - pad.l - pad.r - 20);
+
+  items.forEach((item, i) => {
+    const y = pad.t + gap * i + (gap - bh * 2 - 6) / 2;
+    const y2 = y + bh + 8;
+    svg.appendChild(el('rect',{x:pad.l,y, width: Math.max(2, sx(item.companyPct) - pad.l), height:bh, rx:4, fill:INK}));
+    svg.appendChild(el('rect',{x:pad.l,y:y2, width: Math.max(2, sx(item.peerPct) - pad.l), height:bh, rx:4, fill:GOLD}));
+    text(svg,pad.l-10,y+bh/2+3,item.category,'tl','end');
+    text(svg,sx(item.companyPct)+12,y+bh/2+3,formatPercent(item.companyPct),'tl');
+    text(svg,sx(item.peerPct)+12,y2+bh/2+3,formatPercent(item.peerPct),'tl');
+  });
+
+  for(let g=0; g<=4; g++){
+    const pct = maxPct * g / 4;
+    const x = sx(pct);
+    svg.appendChild(el('line',{x1:x,y1:pad.t,x2:x,y2:h-pad.b,class:'gl'}));
+    text(svg,x,h-pad.b+18,formatPercent(pct),'vl');
+  }
+
+  const legend = document.createElement('div'); legend.className='legend';
+  legend.innerHTML = `<span><i style="background:${INK}"></i>Company %</span><span><i style="background:${GOLD}"></i>Peer %</span>`;
+  document.getElementById(containerId).appendChild(legend);
 }
 
 function renderDashboard(){
@@ -747,6 +862,7 @@ function renderDashboard(){
   renderMonthlyIS();
   renderEbitdaAnalysis();
   renderPayroll();
+  renderReconciliations();
   renderCommonSize();
   updateTabVisibility();
   waterfall();
@@ -766,6 +882,11 @@ const resizeDashboard = (function(){
   };
 })();
 window.addEventListener('resize', resizeDashboard);
+const dashboardElement = document.getElementById('dashboard');
+if (window.ResizeObserver && dashboardElement) {
+  const observer = new ResizeObserver(resizeDashboard);
+  observer.observe(dashboardElement);
+}
 
 /* tab switching (runs after charts so SVG exists) */
 document.querySelectorAll('#dashboard nav button').forEach(b=>b.onclick=()=>{
@@ -785,6 +906,7 @@ function showUploadState(){
   document.getElementById('dashboard').classList.add('hide');
   document.getElementById('uploadState').classList.remove('hide');
   document.getElementById('fileInput').value = '';
+  dashData = null;
   setUploadError('');
   document.querySelectorAll('#dashboard nav button').forEach((btn, idx)=>{
     btn.classList.toggle('active', idx===0);
@@ -838,13 +960,25 @@ function sheetToRows(sheet){
   return parseSheetRows(sheet);
 }
 
-const SECTION_TAGS = new Set(['[meta]','[kpis]','[bridge]','[revenue_margin]','[margin_series]','[gross_margin_months]','[sga_mix]','[key_findings]']);
+const SECTION_TAGS = new Set([
+  'meta','[meta]',
+  'kpis','[kpis]',
+  'bridge','[bridge]',
+  'revenuemargin','[revenuemargin]','revenue margin','[revenue margin]','revenue_margin','[revenue_margin]',
+  'gross margin months','[gross_margin_months]','gross_margin_months','[gross margin months]','gross margin months',
+  'revenue series','[revenue series]','rev_series','[rev_series]',
+  'reconciliations','[reconciliations]','reconciliation','[reconciliation]',
+  'common size','[common size]','common_size','[common_size]',
+  'sg&a','[sg&a]','sg a','sga','[sga]','sga_mix','[sga_mix]',
+  'key findings','[key_findings]','key_findings'
+]);
 function isSectionTag(row){
   return Array.isArray(row) && row.some(cell => SECTION_TAGS.has(normalizeKey(cell)));
 }
 
 function findSection(rows, marker){
-  return rows.findIndex(r => Array.isArray(r) && r.some(cell => normalizeKey(cell) === normalizeKey(marker)));
+  const normalizedMarker = normalizeKey(marker);
+  return rows.findIndex(r => Array.isArray(r) && r.some(cell => normalizeKey(cell) === normalizedMarker));
 }
 
 function parseSection(rows, startIndex){
@@ -917,12 +1051,42 @@ function parseMarginSeriesSheet(sheet){
     const row = rows[i];
     if (!Array.isArray(row) || row.every(cell => cell === undefined || cell === '')) break;
     if (!row[0]) continue;
-    data.push({month: String(row[0]).trim(), value: Number(row[1])});
+    data.push({month: String(row[0]).trim(), value: parseNumericValue(row[1])});
   }
   return data;
 }
 
-function parseSgaAnalysisSheet(sheet){
+function parseRevenueSeriesSheet(sheet){
+  if (!sheet) return [];
+  const rows = sheetToRows(sheet);
+  const headerIndex = rows.findIndex(row => Array.isArray(row) && normalizeKey(row[0]) === 'month');
+  if (headerIndex < 0) return [];
+  const data = [];
+  for (let i = headerIndex + 1; i < rows.length; i++){
+    const row = rows[i];
+    if (!Array.isArray(row) || row.every(cell => cell === undefined || cell === '')) break;
+    if (!row[0]) continue;
+    data.push({month: String(row[0]).trim(), value: parseNumericValue(row[1])});
+  }
+  return data;
+}
+
+function parseReconciliationsSheet(sheet){
+  if (!sheet) return [];
+  const rows = sheetToRows(sheet);
+  const headerIndex = rows.findIndex(row => Array.isArray(row) && normalizeKey(row[0]) === 'name');
+  if (headerIndex < 0) return [];
+  const data = [];
+  for (let i = headerIndex + 1; i < rows.length; i++){
+    const row = rows[i];
+    if (!Array.isArray(row) || row.every(cell => cell === undefined || cell === '')) break;
+    if (!row[0]) continue;
+    data.push({name: String(row[0]).trim(), variance: parseNumericValue(row[1])});
+  }
+  return data;
+}
+
+function parseCommonSizeSheet(sheet){
   if (!sheet) return [];
   const rows = sheetToRows(sheet);
   const headerIndex = rows.findIndex(row => Array.isArray(row) && normalizeKey(row[0]) === 'category');
@@ -932,7 +1096,7 @@ function parseSgaAnalysisSheet(sheet){
     const row = rows[i];
     if (!Array.isArray(row) || row.every(cell => cell === undefined || cell === '')) break;
     if (!row[0]) continue;
-    data.push({category: String(row[0]).trim(), adjustedValueCY: Number(row[2])});
+    data.push({category: String(row[0]).trim(), companyPct: parseNumericValue(row[1]), peerPct: parseNumericValue(row[2])});
   }
   return data;
 }
@@ -947,13 +1111,13 @@ function inferBridgeType(label){
 function parseDashFeed(sheet){
   const rows = sheetToRows(sheet);
   const sectionIndexes = {
-    meta: findSection(rows,'[META]'),
-    kpis: findSection(rows,'[KPIS]'),
-    bridge: findSection(rows,'[BRIDGE]'),
-    revenueMargin: findSection(rows,'[REVENUE_MARGIN]'),
-    marginSeries: findSection(rows,'[MARGIN_SERIES]'),
-    sga: findSection(rows,'[SGA_MIX]'),
-    keyFindings: findSection(rows,'[KEY_FINDINGS]')
+    meta: findSection(rows,'Meta'),
+    kpis: findSection(rows,'KPIs'),
+    bridge: findSection(rows,'Bridge'),
+    revenueMargin: findSection(rows,'RevenueMargin'),
+    marginSeries: findSection(rows,'Gross Margin Months'),
+    sga: findSection(rows,'SG&A'),
+    keyFindings: findSection(rows,'Key Findings')
   };
   const dashData = {
     meta: {},
@@ -970,10 +1134,10 @@ function parseDashFeed(sheet){
   metaRows.forEach(row => {
     const key = normalizeKey(row[0]);
     const value = row[1];
-    if (key === 'client_name') dashData.meta.clientName = String(value || '').trim();
-    if (key === 'period_py_label') dashData.meta.periodPY = String(value || '').trim();
-    if (key === 'period_cy_label') dashData.meta.periodCY = String(value || '').trim();
-    if (key === 'purchase_price') dashData.meta.purchasePrice = Number(value);
+    if (key === 'client name') dashData.meta.clientName = String(value || '').trim();
+    if (key === 'period py' || key === 'period py label') dashData.meta.periodPY = String(value || '').trim();
+    if (key === 'period cy' || key === 'period cy label') dashData.meta.periodCY = String(value || '').trim();
+    if (key === 'purchase price') dashData.meta.purchasePrice = parseNumericValue(value);
     if (key === 'location') dashData.meta.location = String(value || '').trim();
   });
 
@@ -983,15 +1147,11 @@ function parseDashFeed(sheet){
     const key = normalizeKey(row[0]);
     const value = Number(row[1]);
     if (!key) return;
-    if (key === 'revenue_py') dashData.kpis.revenue = {...dashData.kpis.revenue, pyValue: value};
-    if (key === 'revenue_cy') dashData.kpis.revenue = {...dashData.kpis.revenue, cyValue: value};
-    if (key === 'cogs_py') dashData.kpis.cogs = {...dashData.kpis.cogs, pyValue: value};
-    if (key === 'cogs_cy') dashData.kpis.cogs = {...dashData.kpis.cogs, cyValue: value};
-    if (key === 'adj_ebitda_py') dashData.kpis.diligenceAdjEbitda = {...dashData.kpis.diligenceAdjEbitda, pyValue: value};
-    if (key === 'adj_ebitda_cy') dashData.kpis.diligenceAdjEbitda = {...dashData.kpis.diligenceAdjEbitda, cyValue: value};
-    if (key === 'adj_margin_py') dashData.kpis.adjEbitdaMargin = {...dashData.kpis.adjEbitdaMargin, pyValue: value};
-    if (key === 'adj_margin_cy') dashData.kpis.adjEbitdaMargin = {...dashData.kpis.adjEbitdaMargin, cyValue: value};
-    if (key === 'implied_multiple_cy') dashData.kpis.impliedMultiple = {pyValue: NaN, cyValue: value};
+    if (key === 'revenue' || key === 'revenue_py') dashData.kpis.revenue = {...dashData.kpis.revenue, pyValue: parseNumericValue(row[1]), cyValue: parseNumericValue(row[2])};
+    if (key === 'cogs' || key === 'cogs_py') dashData.kpis.cogs = {...dashData.kpis.cogs, pyValue: parseNumericValue(row[1]), cyValue: parseNumericValue(row[2])};
+    if (key === 'diligence adj ebitda' || key === 'adj ebitda' || key === 'adj_ebitda_py') dashData.kpis.diligenceAdjEbitda = {...dashData.kpis.diligenceAdjEbitda, pyValue: parseNumericValue(row[1]), cyValue: parseNumericValue(row[2])};
+    if (key === 'adj ebitda margin' || key === 'adjusted ebitda margin' || key === 'adj_ebitda_margin_py') dashData.kpis.adjEbitdaMargin = {...dashData.kpis.adjEbitdaMargin, pyValue: parseNumericValue(row[1]), cyValue: parseNumericValue(row[2])};
+    if (key === 'implied multiple' || key === 'implied multiple cy') dashData.kpis.impliedMultiple = {pyValue: NaN, cyValue: parseNumericValue(row[2] !== undefined ? row[2] : row[1])};
   });
 
   const bridgeRows = parseSection(rows, sectionIndexes.bridge);
@@ -1001,8 +1161,8 @@ function parseDashFeed(sheet){
     dashData.bridge.push({
       label: String(row[0]).trim(),
       ref: String(row[1] || '').trim(),
-      pyValue: Number(row[2]),
-      cyValue: Number(row[3]),
+      pyValue: parseNumericValue(row[2]),
+      cyValue: parseNumericValue(row[3]),
       type: String(row[4] || '').trim().toLowerCase() || inferBridgeType(row[0])
     });
   });
@@ -1011,8 +1171,8 @@ function parseDashFeed(sheet){
   if (revenueRows.length && normalizeKey(revenueRows[0][0]) === 'metric') revenueRows.shift();
   revenueRows.forEach(row => {
     const label = normalizeKey(row[0]);
-    const py = Number(row[1]);
-    const cy = Number(row[2]);
+    const py = parseNumericValue(row[1]);
+    const cy = parseNumericValue(row[2]);
     if (!label) return;
     if (label === 'revenue') dashData.revenue.revenue = {pyValue: py, cyValue: cy};
     if (label === 'cogs') dashData.revenue.cogs = {pyValue: py, cyValue: cy};
@@ -1036,14 +1196,14 @@ function parseDashFeed(sheet){
   if (marginRows.length && normalizeKey(marginRows[0][0]) === 'month') marginRows.shift();
   marginRows.forEach(row => {
     if (!row[0]) return;
-    dashData.marginSeries.push({month: String(row[0]).trim(), value: Number(row[1])});
+    dashData.marginSeries.push({month: String(row[0]).trim(), value: parseNumericValue(row[1])});
   });
 
-  const sgaRows = parseSectionByCols(rows, sectionIndexes.sga, [3,4]);
-  if (sgaRows.length && normalizeKey(sgaRows[0][3]) === 'category') sgaRows.shift();
+  const sgaRows = parseSection(rows, sectionIndexes.sga);
+  if (sgaRows.length && normalizeKey(sgaRows[0][0]) === 'category') sgaRows.shift();
   sgaRows.forEach(row => {
-    if (!row[3]) return;
-    dashData.sga.push({category: String(row[3]).trim(), adjustedValueCY: Number(row[4])});
+    if (!row[0]) return;
+    dashData.sga.push({category: String(row[0]).trim(), adjustedValueCY: parseNumericValue(row[1])});
   });
 
   const findingsRows = parseSection(rows, sectionIndexes.keyFindings);
@@ -1085,6 +1245,7 @@ function buildSheetTable(sheetData){
 
 function renderSheetSection(sectionId, sheetData, emptyMessage){
   const container = document.getElementById(sectionId);
+  if (!container) return;
   container.innerHTML = '';
   if (!sheetData){
     showSectionMessage(sectionId, emptyMessage);
@@ -1104,88 +1265,146 @@ function validate(dashData){
   if (!dashData || typeof dashData !== 'object') return ['Missing dashData object'];
 
   const meta = dashData.meta || {};
-  if (!meta.clientName) errors.push('Meta.clientName is required');
-  if (!meta.periodPY) errors.push('Meta.periodPY is required');
-  if (!meta.periodCY) errors.push('Meta.periodCY is required');
-  if (!Number.isFinite(meta.purchasePrice)) errors.push('Meta.purchasePrice must be a number');
+  if (!meta.clientName) errors.push('Meta section missing required key: Client Name');
+  if (!meta.periodPY) errors.push('Meta section missing required key: Period PY');
+  if (!meta.periodCY) errors.push('Meta section missing required key: Period CY');
+  if (!Number.isFinite(meta.purchasePrice)) errors.push('Meta section has invalid numeric value: Purchase Price');
+  if (dashData.sections && dashData.sections.meta < 0) errors.push('DASH_FEED section missing: Meta');
 
   const kpis = dashData.kpis || {};
-  if (!kpis.revenue || !Number.isFinite(kpis.revenue.pyValue) || !Number.isFinite(kpis.revenue.cyValue)) errors.push('KPIs.revenue must include numeric PY and CY values');
-  if (!kpis.cogs || !Number.isFinite(kpis.cogs.pyValue) || !Number.isFinite(kpis.cogs.cyValue)) errors.push('KPIs.cogs must include numeric PY and CY values');
-  if (!kpis.diligenceAdjEbitda || !Number.isFinite(kpis.diligenceAdjEbitda.pyValue) || !Number.isFinite(kpis.diligenceAdjEbitda.cyValue)) errors.push('KPIs.diligenceAdjEbitda must include numeric PY and CY values');
-  if (!kpis.adjEbitdaMargin || !Number.isFinite(kpis.adjEbitdaMargin.pyValue) || !Number.isFinite(kpis.adjEbitdaMargin.cyValue)) errors.push('KPIs.adjEbitdaMargin must include numeric PY and CY values');
-  if (!kpis.impliedMultiple || !Number.isFinite(kpis.impliedMultiple.cyValue)) errors.push('KPIs.impliedMultiple must include numeric CY value');
+  if (!kpis.revenue || !Number.isFinite(kpis.revenue.pyValue) || !Number.isFinite(kpis.revenue.cyValue)) errors.push('KPIs section must include numeric Revenue PY and CY values');
+  if (!kpis.cogs || !Number.isFinite(kpis.cogs.pyValue) || !Number.isFinite(kpis.cogs.cyValue)) errors.push('KPIs section must include numeric COGS PY and CY values');
+  if (!kpis.diligenceAdjEbitda || !Number.isFinite(kpis.diligenceAdjEbitda.pyValue) || !Number.isFinite(kpis.diligenceAdjEbitda.cyValue)) errors.push('KPIs section must include numeric Diligence Adj EBITDA PY and CY values');
+  if (!kpis.adjEbitdaMargin || !Number.isFinite(kpis.adjEbitdaMargin.pyValue) || !Number.isFinite(kpis.adjEbitdaMargin.cyValue)) errors.push('KPIs section must include numeric Adj EBITDA Margin PY and CY values');
+  if (!kpis.impliedMultiple || !Number.isFinite(kpis.impliedMultiple.cyValue)) errors.push('KPIs section must include numeric Implied Multiple CY value');
 
-  if (dashData.sections && dashData.sections.sga < 0) errors.push('SG&A section not found; expected a row with SG&A in column A');
-  if (!Array.isArray(dashData.sga) || dashData.sga.length === 0) errors.push('SG&A must include at least one row');
-  else dashData.bridge.forEach((row,i)=>{
-    if (!row.label) errors.push(`Bridge row ${i+1} missing label`);
-    if (!Number.isFinite(row.pyValue)) errors.push(`Bridge row ${i+1} PY value must be numeric`);
-    if (!Number.isFinite(row.cyValue)) errors.push(`Bridge row ${i+1} CY value must be numeric`);
-    if (!['reported','adjustment','subtotal'].includes(row.type)) errors.push(`Bridge row ${i+1} type must be reported, adjustment, or subtotal`);
-  });
+  if (dashData.sections && dashData.sections.bridge < 0) {
+    errors.push('DASH_FEED section missing: Bridge');
+  }
+  if (!Array.isArray(dashData.bridge) || dashData.bridge.length === 0) {
+    errors.push('Bridge section must include at least one row');
+  } else {
+    dashData.bridge.forEach((row,i)=>{
+      if (!row.label) errors.push(`Bridge row ${i+1} missing label`);
+      if (!Number.isFinite(row.pyValue)) errors.push(`Bridge row ${row.label || i+1} has invalid PY value`);
+      if (!Number.isFinite(row.cyValue)) errors.push(`Bridge row ${row.label || i+1} has invalid CY value`);
+      if (!['reported','adjustment','subtotal'].includes(row.type)) errors.push(`Bridge row ${row.label || i+1} has invalid type; expected reported, adjustment, or subtotal`);
+    });
+  }
 
-  if (!Array.isArray(dashData.marginSeries) || dashData.marginSeries.length !== 12) errors.push('Gross margin series must include 12 rows');
-  else dashData.marginSeries.forEach((row,i)=>{
-    if (!row.month) errors.push(`Gross margin row ${i+1} missing month`);
-    if (!Number.isFinite(row.value)) errors.push(`Gross margin row ${i+1} value must be numeric`);
-  });
+  if (dashData.sections && dashData.sections.revenueMargin < 0) {
+    errors.push('DASH_FEED section missing: RevenueMargin');
+  }
+  if (!Array.isArray(dashData.revenue) || !dashData.revenue.revenue || !Number.isFinite(dashData.revenue.revenue.pyValue) || !Number.isFinite(dashData.revenue.revenue.cyValue)) {
+    errors.push('Revenue & Margin section must include numeric Revenue PY and CY values');
+  }
+  if (!dashData.revenue.cogs || !Number.isFinite(dashData.revenue.cogs.pyValue) || !Number.isFinite(dashData.revenue.cogs.cyValue)) {
+    errors.push('Revenue & Margin section must include numeric COGS PY and CY values');
+  }
+  if (!dashData.revenue.grossProfit || !Number.isFinite(dashData.revenue.grossProfit.pyValue) || !Number.isFinite(dashData.revenue.grossProfit.cyValue)) {
+    errors.push('Revenue & Margin section must include numeric Gross Profit PY and CY values');
+  }
 
-  if (!Array.isArray(dashData.sga) || dashData.sga.length === 0) errors.push('SG&A must include at least one row');
-  else dashData.sga.forEach((row,i)=>{
-    if (!row.category) errors.push(`SG&A row ${i+1} missing category`);
-    if (!Number.isFinite(row.adjustedValueCY)) errors.push(`SG&A row ${i+1} adjusted_value_cy must be numeric`);
-  });
+  if (dashData.sections && dashData.sections.marginSeries < 0) {
+    errors.push('DASH_FEED section missing: Gross Margin Months');
+  }
+  if (!Array.isArray(dashData.marginSeries) || dashData.marginSeries.length !== 12) {
+    errors.push('Gross Margin Months section must include 12 rows');
+  } else {
+    dashData.marginSeries.forEach((row,i)=>{
+      if (!row.month) errors.push(`Gross Margin Months row ${i+1} missing Month`);
+      if (!Number.isFinite(row.value)) errors.push(`Gross Margin Months row ${row.month || i+1} has invalid Gross Margin % value`);
+    });
+  }
 
-  if (!Array.isArray(dashData.keyFindings) || dashData.keyFindings.length === 0) errors.push('Key Findings must include at least one finding');
+  if (dashData.sections && dashData.sections.revenueSeries < 0) {
+    errors.push('DASH_FEED section missing: Revenue Series');
+  }
+  if (dashData.revenueSeries && dashData.revenueSeries.length && dashData.revenueSeries.length !== 12) {
+    errors.push('Revenue Series section must include 12 rows');
+  } else if (dashData.revenueSeries && dashData.revenueSeries.length) {
+    dashData.revenueSeries.forEach((row,i)=>{
+      if (!row.month) errors.push(`Revenue Series row ${i+1} missing Month`);
+      if (!Number.isFinite(row.value)) errors.push(`Revenue Series row ${row.month || i+1} has invalid Revenue value`);
+    });
+  }
+
+  if (dashData.sections && dashData.sections.reconciliations < 0) {
+    errors.push('DASH_FEED section missing: Reconciliations');
+  }
+  if (!Array.isArray(dashData.reconciliations) || dashData.reconciliations.length === 0) {
+    errors.push('Reconciliations section must include at least one row');
+  } else {
+    dashData.reconciliations.forEach((row,i)=>{
+      if (!row.name) errors.push(`Reconciliations row ${i+1} missing Name`);
+      if (!Number.isFinite(row.variance)) errors.push(`Reconciliations row ${row.name || i+1} has invalid Variance value`);
+    });
+  }
+
+  if (!Array.isArray(dashData.sga) || dashData.sga.length === 0) {
+    errors.push('SG&A section must include at least one row');
+  } else {
+    dashData.sga.forEach((row,i)=>{
+      if (!row.category) errors.push(`SG&A row ${i+1} missing Category`);
+      if (!Number.isFinite(row.adjustedValueCY)) errors.push(`SG&A row ${row.category || i+1} has invalid CY Value`);
+    });
+  }
+  if (dashData.sections && dashData.sections.sga < 0) errors.push('DASH_FEED section missing: SG&A');
+
+  if (!Array.isArray(dashData.keyFindings) || dashData.keyFindings.length === 0) errors.push('Key Findings section must include at least one finding');
+  if (dashData.sections && dashData.sections.keyFindings < 0) errors.push('DASH_FEED section missing: Key Findings');
   return errors;
 }
 
 let dashData = null;
 
+function parseWorkbookData(arrayBuffer){
+  const data = new Uint8Array(arrayBuffer);
+  const workbook = XLSX.read(data, {type:'array'});
+  if (!workbook || !workbook.Sheets){
+    throw new Error('Upload failed: unable to read the file as an XLSX workbook.');
+  }
+  const dashFeedSheet = workbook.Sheets['DASH_FEED'];
+  if (!dashFeedSheet) throw new Error('Upload failed: workbook does not contain a sheet named DASH_FEED.');
+  dashData = parseDashFeed(dashFeedSheet);
+  dashData.monthlyIS = parseMonthlyIS(workbook.Sheets['Monthly IS']);
+  dashData.ebitdaAnalysis = parseEbitdaAnalysis(workbook.Sheets['EBITDA Analysis']);
+  dashData.payroll = parsePayrollAnalysis(workbook.Sheets['Payroll Analysis']);
+  dashData.commonSize = parseCommonSizeSheet(workbook.Sheets['Common Size Analysis'] || workbook.Sheets['Common Size']);
+  dashData.reconciliations = parseReconciliationsSheet(workbook.Sheets['Reconciliations']);
+  dashData.revenueSeries = parseRevenueSeriesSheet(workbook.Sheets['Revenue Series']);
+  if (!dashData.marginSeries || dashData.marginSeries.length === 0) {
+    dashData.marginSeries = parseMarginSeriesSheet(workbook.Sheets['Mthly Rev and Margin Trends']);
+  }
+  if (!dashData.sga || dashData.sga.length === 0) {
+    dashData.sga = parseSgaAnalysisSheet(workbook.Sheets['SG&A Analysis']);
+  }
+}
+
 function handleFile(file){
   // Validate file type and parse the uploaded workbook into dashData.
   setUploadError('');
   if (typeof XLSX === 'undefined'){
-    setUploadError('Vendor library vendor/xlsx.full.min.js is missing or empty. Please install the vendored SheetJS bundle before uploading.');
+    setUploadError('Upload failed: XLSX library is not loaded. Please ensure vendor/xlsx.full.min.js is present.');
     return;
   }
   if (!file.name.toLowerCase().endsWith('.xlsx')){
-    setUploadError('Please upload a valid .xlsx file containing a DASH_FEED worksheet.');
+    setUploadError('Upload failed: the file must be a .xlsx workbook.');
     return;
   }
   const reader = new FileReader();
   reader.onload = (event) => {
     try {
-      const data = new Uint8Array(event.target.result);
-      const workbook = XLSX.read(data, {type:'array'});
-      if (!workbook || !workbook.Sheets){
-        throw new Error('Unable to read workbook structure.');
-      }
-      const dashFeedSheet = workbook.Sheets['DASH_FEED'];
-      if (!dashFeedSheet) throw new Error('Workbook does not contain a sheet named DASH_FEED.');
-      dashData = parseDashFeed(dashFeedSheet);
-      dashData.monthlyIS = parseMonthlyIS(workbook.Sheets['Monthly IS']);
-      dashData.ebitdaAnalysis = parseEbitdaAnalysis(workbook.Sheets['EBITDA Analysis']);
-      dashData.payroll = parsePayrollAnalysis(workbook.Sheets['Payroll Analysis']);
-      dashData.commonSize = parseCommonSizeAnalysis(workbook.Sheets['Common Size Analysis']);
-      if (!dashData.marginSeries || dashData.marginSeries.length === 0) {
-        dashData.marginSeries = parseMarginSeriesSheet(workbook.Sheets['Mthly Rev and Margin Trends']);
-      }
-      if (!dashData.sga || dashData.sga.length === 0) {
-        dashData.sga = parseSgaAnalysisSheet(workbook.Sheets['SG&A Analysis']);
-      }
-      console.log('Parsed dashData from DASH_FEED and extra sheets:', dashData);
+      parseWorkbookData(event.target.result);
       const errors = validate(dashData);
       if (errors.length){
-        setUploadError('Workbook validation failed. Please confirm the DASH_FEED schema and fix these items: ' + errors.join('; '));
+        setUploadError('Workbook validation failed: ' + errors.join('; '));
         return;
       }
-      console.log('dashData', dashData);
       renderDashboard();
       showDashboard();
     } catch (error) {
-      setUploadError('Unable to parse workbook. Please ensure DASH_FEED is formatted correctly. ' + error.message);
+      setUploadError('Unable to parse workbook. ' + error.message);
     }
   };
   reader.onerror = () => {
@@ -1194,13 +1413,40 @@ function handleFile(file){
   reader.readAsArrayBuffer(file);
 }
 
+async function loadSampleData(){
+  setUploadError('');
+  if (typeof XLSX === 'undefined'){
+    setUploadError('Sample load failed: XLSX library is not loaded.');
+    return;
+  }
+  try {
+    const response = await fetch('Fake_Databook_Full.xlsx');
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const buffer = await response.arrayBuffer();
+    parseWorkbookData(buffer);
+    const errors = validate(dashData);
+    if (errors.length){
+      setUploadError('Sample workbook validation failed: ' + errors.join('; '));
+      return;
+    }
+    renderDashboard();
+    showDashboard();
+  } catch (error) {
+    setUploadError('Unable to load sample workbook. Use Live Server or the deployed site. ' + error.message);
+  }
+}
+
 const uploadArea = document.getElementById('uploadArea');
 const fileInput = document.getElementById('fileInput');
 const browseFile = document.getElementById('browseFile');
+const loadSample = document.getElementById('loadSample');
 const resetFile = document.getElementById('resetFile');
+const printDashboard = document.getElementById('printDashboard');
 
 browseFile.addEventListener('click', ()=>fileInput.click());
+loadSample.addEventListener('click', loadSampleData);
 resetFile.addEventListener('click', showUploadState);
+printDashboard.addEventListener('click', ()=>window.print());
 
 uploadArea.addEventListener('click', ()=>fileInput.click());
 uploadArea.addEventListener('dragover', e=>{

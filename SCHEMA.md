@@ -6,14 +6,16 @@ The sheet must be simple, human-editable, and deterministic. No merged cells, no
 
 ## Sheet: `DASH_FEED`
 
-The sheet is divided into four sections:
+The sheet is divided into eight sections:
 
 1. Meta
 2. KPIs
 3. Bridge
 4. Revenue & Margin
-5. SG&A
-6. Key Findings
+5. Reconciliations
+6. Common Size
+7. SG&A
+8. Key Findings
 
 Use the exact section headers and column layout shown below.
 
@@ -119,9 +121,72 @@ Notes:
 - The dashboard expects exactly 12 rows for the monthly series.
 - The month names should be the standard three-letter abbreviations.
 
+### Optional 12-month revenue series
+
+| A | B |
+|---|---|
+| `Revenue Series` | *(literal section marker)* |
+| `Month` | `Revenue` |
+| Apr | 214456 |
+| May | 219302 |
+| Jun | 221789 |
+| Jul | 211098 |
+| Aug | 218450 |
+| Sep | 219890 |
+| Oct | 205230 |
+| Nov | 212310 |
+| Dec | 230015 |
+| Jan | 196800 |
+| Feb | 202120 |
+| Mar | 216600 |
+
+Notes:
+- `Revenue Series` is optional but required to render the monthly revenue bars on the Revenue & Margin tab.
+- Values should be the same units as the rest of the workbook.
+
 ---
 
-## 5. SG&A
+## 5. Reconciliations
+
+This section provides a quick health check for reconciliation variances.
+
+| A | B |
+|---|---|
+| `Reconciliations` | *(literal section marker)* |
+| `Name` | `Variance` |
+| Proof of Cash | 0 |
+| Payroll Rec | 1500 |
+| Tax Rec | 0 |
+
+Notes:
+- Variance values should be numeric and represent the reconciliation gap in dollars.
+- A zero variance indicates the reconciliation is within tolerance.
+
+---
+
+## 6. Common Size
+
+This section provides company and peer percentage metrics.
+
+| A | B | C |
+|---|---|---|
+| `Common Size` | *(literal section marker)* | |
+| `Category` | `Company %` | `Peer %` |
+| Labor - DVM | 27.5% | 25.0% |
+| Labor - Staff | 30.4% | 28.5% |
+| Labor & Fringe | 8.9% | 9.2% |
+| Facility & Equip | 7.0% | 8.0% |
+| Admin | 4.3% | 4.5% |
+| Fee/Collection | 3.0% | 3.4% |
+| Marketing | 1.1% | 1.0% |
+
+Notes:
+- Percentage values may be entered as decimals or percentages.
+- The chart compares the company against a peer benchmark.
+
+---
+
+## 7. SG&A
 
 This section contains the opex mix values for the current year.
 

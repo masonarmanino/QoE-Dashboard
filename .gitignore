@@ -1,0 +1,5 @@
+# Ignore uploaded or scratch Excel files by default
+*.xlsx
+
+# Keep the canonical test workbook in the repo
+!Fake_Databook_Full.xlsx
