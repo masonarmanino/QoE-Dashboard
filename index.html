@@ -582,13 +582,13 @@ function sheetToRows(sheet){
   return rows.map(r => Array.isArray(r) ? r : [r]).map(r => r.map(v => v===undefined || v===null ? '' : v));
 }
 
-const SECTION_TAGS = new Set(['meta','kpis','bridge','revenuemargin','gross margin months','sg&a','key findings']);
+const SECTION_TAGS = new Set(['[meta]','[kpis]','[bridge]','[revenue_margin]','[margin_series]','[gross_margin_months]','[sga_mix]','[key_findings]']);
 function isSectionTag(row){
-  return Array.isArray(row) && SECTION_TAGS.has(normalizeKey(row[0]));
+  return Array.isArray(row) && row.some(cell => SECTION_TAGS.has(normalizeKey(cell)));
 }
 
 function findSection(rows, marker){
-  return rows.findIndex(r => normalizeKey(r[0]) === normalizeKey(marker));
+  return rows.findIndex(r => Array.isArray(r) && r.some(cell => normalizeKey(cell) === normalizeKey(marker)));
 }
 
 function parseSection(rows, startIndex){
@@ -597,7 +597,20 @@ function parseSection(rows, startIndex){
   for (let i = startIndex + 1; i < rows.length; i++){
     const row = rows[i];
     if (isSectionTag(row)) break;
-    if (Array.isArray(row) && row.every(cell => cell === '')) break;
+    if (Array.isArray(row) && row.every(cell => cell === '')) continue;
+    section.push(row);
+  }
+  return section;
+}
+
+function parseSectionByCols(rows, startIndex, colIndexes){
+  if (startIndex < 0) return [];
+  const section = [];
+  for (let i = startIndex + 1; i < rows.length; i++){
+    const row = rows[i];
+    if (isSectionTag(row)) break;
+    const hasRelevantData = colIndexes.some(ci => row[ci] !== undefined && row[ci] !== '');
+    if (!hasRelevantData) break;
     section.push(row);
   }
   return section;
@@ -613,13 +626,13 @@ function inferBridgeType(label){
 function parseDashFeed(sheet){
   const rows = sheetToRows(sheet);
   const sectionIndexes = {
-    meta: findSection(rows,'Meta'),
-    kpis: findSection(rows,'KPIs'),
-    bridge: findSection(rows,'Bridge'),
-    revenueMargin: findSection(rows,'RevenueMargin'),
-    grossMargin: findSection(rows,'Gross Margin Months'),
-    sga: findSection(rows,'SG&A'),
-    keyFindings: findSection(rows,'Key Findings')
+    meta: findSection(rows,'[META]'),
+    kpis: findSection(rows,'[KPIS]'),
+    bridge: findSection(rows,'[BRIDGE]'),
+    revenueMargin: findSection(rows,'[REVENUE_MARGIN]'),
+    marginSeries: findSection(rows,'[MARGIN_SERIES]'),
+    sga: findSection(rows,'[SGA_MIX]'),
+    keyFindings: findSection(rows,'[KEY_FINDINGS]')
   };
   const dashData = {
     meta: {},
@@ -642,7 +655,7 @@ function parseDashFeed(sheet){
     if (key === 'purchase price') dashData.meta.purchasePrice = Number(value);
   });
 
-  const kpiRows = parseSection(rows, findSection(rows,'KPIs'));
+  const kpiRows = parseSection(rows, sectionIndexes.kpis);
   if (kpiRows.length && normalizeKey(kpiRows[0][0]) === 'metric') kpiRows.shift();
   kpiRows.forEach(row => {
     const label = normalizeKey(row[0]);
@@ -655,8 +668,8 @@ function parseDashFeed(sheet){
     if (label === 'implied multiple') dashData.kpis.impliedMultiple = {pyValue: py, cyValue: cy};
   });
 
-  const bridgeRows = parseSection(rows, findSection(rows,'Bridge'));
-  if (bridgeRows.length && normalizeKey(bridgeRows[0][0]) === 'label') bridgeRows.shift();
+  const bridgeRows = parseSection(rows, sectionIndexes.bridge);
+  if (bridgeRows.length && normalizeKey(bridgeRows[0][0]) === 'line') bridgeRows.shift();
   bridgeRows.forEach(row => {
     if (!row[0] || row.every(cell => cell === '')) return;
     dashData.bridge.push({
@@ -668,7 +681,7 @@ function parseDashFeed(sheet){
     });
   });
 
-  const revenueRows = parseSection(rows, findSection(rows,'RevenueMargin'));
+  const revenueRows = parseSection(rows, sectionIndexes.revenueMargin);
   if (revenueRows.length && normalizeKey(revenueRows[0][0]) === 'metric') revenueRows.shift();
   revenueRows.forEach(row => {
     const label = normalizeKey(row[0]);
@@ -680,24 +693,38 @@ function parseDashFeed(sheet){
     if (label === 'gross profit') dashData.revenue.grossProfit = {pyValue: py, cyValue: cy};
   });
 
-  const marginRows = parseSection(rows, findSection(rows,'Gross Margin Months'));
+  if (!dashData.revenue.revenue && dashData.kpis.revenue) {
+    dashData.revenue.revenue = {...dashData.kpis.revenue};
+  }
+  if (!dashData.revenue.cogs && dashData.kpis.cogs) {
+    dashData.revenue.cogs = {...dashData.kpis.cogs};
+  }
+  if (!dashData.revenue.grossProfit && dashData.revenue.revenue && dashData.revenue.cogs) {
+    dashData.revenue.grossProfit = {
+      pyValue: dashData.revenue.revenue.pyValue - dashData.revenue.cogs.pyValue,
+      cyValue: dashData.revenue.revenue.cyValue - dashData.revenue.cogs.cyValue
+    };
+  }
+
+  const marginRows = parseSection(rows, sectionIndexes.marginSeries);
   if (marginRows.length && normalizeKey(marginRows[0][0]) === 'month') marginRows.shift();
   marginRows.forEach(row => {
     if (!row[0]) return;
     dashData.marginSeries.push({month: String(row[0]).trim(), value: Number(row[1])});
   });
 
-  const sgaRows = parseSection(rows, sectionIndexes.sga);
-  if (sgaRows.length && normalizeKey(sgaRows[0][0]) === 'category') sgaRows.shift();
+  const sgaRows = parseSectionByCols(rows, sectionIndexes.sga, [3,4]);
+  if (sgaRows.length && normalizeKey(sgaRows[0][3]) === 'category') sgaRows.shift();
   sgaRows.forEach(row => {
-    if (!row[0]) return;
-    dashData.sga.push({category: String(row[0]).trim(), adjustedValueCY: Number(row[1])});
+    if (!row[3]) return;
+    dashData.sga.push({category: String(row[3]).trim(), adjustedValueCY: Number(row[4])});
   });
 
   const findingsRows = parseSection(rows, sectionIndexes.keyFindings);
   findingsRows.forEach(row => {
-    if (!row[1]) return;
-    dashData.keyFindings.push(String(row[1]).trim());
+    const text = String(row[1] || row[0] || '').trim();
+    if (!text) return;
+    dashData.keyFindings.push(text);
   });
 
   return dashData;
