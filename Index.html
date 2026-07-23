@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Armanino · QofE Dashboard — Poolesville Veterinary Clinic (Prototype)</title>
+<title>Armanino · QofE Dashboard — Prototype</title>
 <style>
   :root{
     --ink:#222222;         /* Mine Shaft */
@@ -55,6 +55,22 @@
   footer{color:var(--muted);font-size:11px;text-align:center;padding:24px;}
   .legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:12px;font-size:12px;color:#444;}
   .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:middle;}
+  .upload-state{display:flex;justify-content:center;align-items:center;padding:48px 28px;min-height:60vh;}
+  .upload-card{max-width:640px;text-align:center;}
+  .upload-card h2{font-size:24px;margin-bottom:8px;}
+  .upload-card p{color:var(--muted);margin:0 0 24px;}
+  .upload-zone{border:2px dashed var(--line);border-radius:20px;padding:48px 20px;cursor:pointer;background:#fff;transition:background .2s,border-color .2s;}
+  .upload-zone.dragover{background:#fffbe4;border-color:var(--gold);}
+  .upload-zone div{font-size:16px;color:var(--ink);}
+  .upload-actions{display:flex;justify-content:center;align-items:center;gap:14px;margin-top:22px;flex-wrap:wrap;}
+  .btn{border:none;border-radius:999px;padding:12px 18px;font-weight:600;cursor:pointer;}
+  .btn-primary{background:var(--gold);color:var(--ink);}
+  .btn-reset{background:none;color:var(--ink);border:1px solid var(--line);padding:8px 14px;border-radius:999px;font-size:13px;}
+  .upload-hint{font-size:12px;color:var(--muted);}
+  .upload-error{margin-top:18px;padding:14px 18px;border:1px solid #E0B966;background:#FFF4CC;color:#5F4B00;border-radius:12px;text-align:left;font-size:13px;}
+  .no-data-message{margin-bottom:18px;padding:16px 18px;border:1px solid #E0B966;background:#fff8e8;color:#5F4B00;border-radius:12px;font-size:13px;}
+  .dashboard-top{max-width:1200px;margin:0 auto;padding:18px 28px;display:flex;justify-content:flex-end;}
+  .hide{display:none;}
   svg{width:100%;height:auto;display:block;}
   .axis{stroke:var(--line);stroke-width:1;}
   .gl{stroke:#EFEFE9;stroke-width:1;}
@@ -73,36 +89,49 @@
   </div>
   <div style="text-align:right">
     <span class="badge">Prototype</span>
-    <div style="font-size:12px;color:#c9c9c2;margin-top:8px">Poolesville Veterinary Clinic · TTM Mar-26</div>
+    <div id="clientLabel" style="font-size:12px;color:#c9c9c2;margin-top:8px">Client name · period</div>
   </div>
 </header>
 
-<nav>
-  <button class="active" data-tab="overview">Overview</button>
-  <button data-tab="bridge">EBITDA Bridge</button>
-  <button data-tab="revenue">Revenue &amp; Margin</button>
-  <button data-tab="sga">SG&amp;A</button>
-</nav>
+<section id="uploadState" class="upload-state">
+  <div class="card upload-card">
+    <h2>Upload dashboard data</h2>
+    <p>Drag and drop a <strong>.xlsx</strong> file here, or browse to select one.</p>
+    <div id="uploadArea" class="upload-zone">
+      <div>Drop your Excel workbook here</div>
+    </div>
+    <div class="upload-actions">
+      <button id="browseFile" class="btn btn-primary" type="button">Browse for .xlsx</button>
+      <div class="upload-hint">Offline workbook upload only.</div>
+    </div>
+    <div id="uploadError" class="upload-error hide" role="alert"></div>
+    <input id="fileInput" type="file" accept=".xlsx" class="hide" />
+  </div>
+</section>
 
-<main>
+<div id="dashboard" class="hide">
+  <div class="dashboard-top"><button id="resetFile" class="btn-reset" type="button">Load different file</button></div>
+  <nav>
+    <button class="active" data-tab="overview">Overview</button>
+    <button data-tab="bridge">EBITDA Bridge</button>
+    <button data-tab="revenue">Revenue &amp; Margin</button>
+    <button data-tab="sga">SG&amp;A</button>
+  </nav>
+
+  <main>
   <!-- OVERVIEW -->
   <section id="overview">
     <div class="kpis">
-      <div class="kpi"><div class="lbl">Revenue (TTM Mar-26)</div><div class="val">$2.62M</div><div class="sub"><span class="up">▲ 2.1%</span> vs. TTM Mar-25</div></div>
-      <div class="kpi"><div class="lbl">Diligence Adj. EBITDA</div><div class="val">$236.7K</div><div class="sub"><span class="down">▼ 16.2%</span> vs. $282.6K PY</div></div>
-      <div class="kpi"><div class="lbl">Adj. EBITDA Margin</div><div class="val">9.0%</div><div class="sub">11.0% in TTM Mar-25</div></div>
-      <div class="kpi"><div class="lbl">Implied Multiple</div><div class="val">16.9x</div><div class="sub">on $4.0M cash purchase price</div></div>
+      <div class="kpi"><div class="lbl" id="kpiRevenueLabel">Revenue</div><div class="val" id="kpiRevenueValue"></div><div class="sub" id="kpiRevenueSub"></div></div>
+      <div class="kpi"><div class="lbl">Diligence Adj. EBITDA</div><div class="val" id="kpiEbitdaValue"></div><div class="sub" id="kpiEbitdaSub"></div></div>
+      <div class="kpi"><div class="lbl">Adj. EBITDA Margin</div><div class="val" id="kpiMarginValue"></div><div class="sub" id="kpiMarginSub"></div></div>
+      <div class="kpi"><div class="lbl">Implied Multiple</div><div class="val" id="kpiMultipleValue"></div><div class="sub" id="kpiMultipleSub"></div></div>
     </div>
     <div class="grid">
-      <div class="card"><h3>EBITDA: Reported → Adjusted</h3><div class="cap">Seller &amp; diligence adjustments, TTM Mar-26</div><div id="cWaterfall"></div></div>
+      <div class="card"><h3>EBITDA: Reported → Adjusted</h3><div class="cap">Seller &amp; diligence adjustments</div><div id="cWaterfall"></div></div>
       <div class="card"><h3>Gross Margin Trend</h3><div class="cap">Monthly, cash-basis inventory drives swings</div><div id="cMargin"></div></div>
       <div class="card full"><h3>Key Findings at a glance</h3><div class="cap">Auto-surfaced from the Key Findings tab</div>
-        <ul style="font-size:13px;line-height:1.7;color:#444;margin:0;padding-left:18px">
-          <li>Dr. Eeg (owner) moves to <strong>20% of production</strong> post-close; comp normalized in Adjustment B.</li>
-          <li><strong>~2.5% gross-margin decline</strong> Mar-25 → Mar-26, attributed to IDEXX price increases &amp; higher 1099 relief-vet use.</li>
-          <li>CareVet valuation revised: FY25 Adj. EBITDA <strong>$350K → $250K</strong> after ~$100K revenue reduction (discounts/rebates).</li>
-          <li>Cash proof analysis for the twelve months ended Mar-26 nets to a <strong>$0 variance</strong>.</li>
-        </ul>
+        <ul id="keyFindingsList" style="font-size:13px;line-height:1.7;color:#444;margin:0;padding-left:18px"></ul>
       </div>
     </div>
   </section>
@@ -112,56 +141,53 @@
     <div class="card full">
       <h3>Quality of Earnings Bridge</h3><div class="cap">Reported net loss reconciled to Diligence Adjusted EBITDA · $ actuals</div>
       <table>
-        <thead><tr><th>Line</th><th>Ref.</th><th>TTM Mar-25</th><th>TTM Mar-26</th></tr></thead>
-        <tbody>
-          <tr><td>Reported EBITDA</td><td></td><td>39,495</td><td>(10,017)</td></tr>
-          <tr class="adj"><td><span class="chip">A</span>Nonrecurring Expenses</td><td>A</td><td>44,825</td><td>41,217</td></tr>
-          <tr class="tot"><td>Seller Adjusted EBITDA</td><td></td><td>84,321</td><td>31,200</td></tr>
-          <tr class="adj"><td><span class="chip">B</span>DVM Compensation</td><td>B</td><td>180,191</td><td>188,262</td></tr>
-          <tr class="adj"><td><span class="chip">C</span>Proforma Insurance</td><td>C</td><td>0</td><td>0</td></tr>
-          <tr class="adj"><td><span class="chip">D</span>Rent Normalization</td><td>D</td><td>(14,276)</td><td>(189)</td></tr>
-          <tr class="adj"><td><span class="chip">E</span>Family on Payroll</td><td>E</td><td>9,065</td><td>8,397</td></tr>
-          <tr class="adj"><td><span class="chip">F</span>Non-recurring Legal Fees</td><td>F</td><td>(1,800)</td><td>9,075</td></tr>
-          <tr class="adj"><td><span class="chip">G</span>Loss on Disposal of Asset</td><td>G</td><td>25,053</td><td>0</td></tr>
-          <tr class="tot"><td>Diligence Adjusted EBITDA</td><td></td><td>282,553</td><td>236,745</td></tr>
-        </tbody>
+        <thead><tr><th>Line</th><th>Ref.</th><th>PY</th><th>CY</th></tr></thead>
+        <tbody id="bridgeBody"></tbody>
       </table>
     </div>
-    <div class="card full" style="margin-top:18px"><h3>Adjustment contribution — TTM Mar-26</h3><div class="cap">Which add-backs move the number</div><div id="cAdj"></div></div>
+    <div class="card full" style="margin-top:18px"><h3>Adjustment contribution</h3><div class="cap">Which add-backs move the number</div><div id="cAdj"></div></div>
   </section>
 
   <!-- REVENUE -->
   <section id="revenue" class="hide">
-    <div class="card full"><h3>Revenue &amp; Gross Profit</h3><div class="cap">TTM comparison · $ actuals</div><div id="cRev"></div></div>
+    <div class="card full"><h3>Revenue &amp; Gross Profit</h3><div class="cap">Period comparison · $ actuals</div><div id="cRev"></div></div>
     <div class="grid" style="margin-top:18px">
-      <div class="card"><h3>Revenue</h3><table><tbody>
-        <tr><td>TTM Mar-25</td><td>$2,568,154</td></tr>
-        <tr><td>TTM Mar-26</td><td>$2,621,078</td></tr>
-        <tr class="tot"><td>Change</td><td>+$52,924 (2.1%)</td></tr></tbody></table></div>
-      <div class="card"><h3>Cost of Products / Gross Profit</h3><table><tbody>
-        <tr><td>COGS TTM Mar-26</td><td>$735,422</td></tr>
-        <tr><td>Gross Profit TTM Mar-26</td><td>$1,885,656</td></tr>
-        <tr class="tot"><td>Gross Margin</td><td>71.9% (was 74.5%)</td></tr></tbody></table></div>
+      <div class="card"><h3>Revenue</h3><table><tbody id="revSummaryBody"></tbody></table></div>
+      <div class="card"><h3>Cost of Products / Gross Profit</h3><table><tbody id="revMarginBody"></tbody></table></div>
     </div>
   </section>
 
   <!-- SG&A -->
   <section id="sga" class="hide">
-    <div class="card full"><h3>Adjusted Operating Expense Mix — TTM Mar-26</h3><div class="cap">Linked from the Adj FS tab</div><div id="cSga"></div></div>
+    <div class="card full"><h3>Adjusted Operating Expense Mix</h3><div class="cap">Linked from the Adj FS tab</div><div id="cSga"></div></div>
   </section>
 </main>
+</div>
 
 <footer>
-  Prototype dashboard generated from <em>Databook DRAFT - Poolesville Vet Clinic_live.xlsx</em> · Armanino Transaction Advisory ·
-  Illustrative only — figures shown for concept demonstration.
-</footer>
+  Prototype dashboard generated from uploaded dashboard data · Armanino Transaction Advisory ·
+  Illustrative only — figures shown for concept demonstration.</footer>
 
+<script src="vendor/xlsx.full.min.js"></script>
 <script>
 /* Self-contained SVG charting — no external libraries, loads offline & inside SharePoint/Teams */
 const GOLD='#F4A831', OLIVE='#898A38', INK='#222222', NEG='#C0532B', GREY='#CFCEC4';
 const NS='http://www.w3.org/2000/svg';
 const el=(t,a)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);return e;};
-const money=v=>'$'+Math.round(v/1000)+'K';
+
+// --- number formatting helpers ------------------------------------------------
+function formatCurrency(value){
+  if (!Number.isFinite(value)) return '-';
+  const abs = Math.abs(value);
+  if (abs >= 1000000) return '$' + (value / 1000000).toFixed(1) + 'M';
+  if (abs >= 1000) return '$' + Math.round(value / 1000) + 'K';
+  return '$' + value.toLocaleString();
+}
+
+function formatPercent(value, decimals=1){
+  if (!Number.isFinite(value)) return '-';
+  return value.toFixed(decimals) + '%';
+}
 
 function frame(id,w,h,pad){
   const box=document.getElementById(id);
@@ -171,136 +197,605 @@ function frame(id,w,h,pad){
 }
 function text(svg,x,y,s,cls,anchor){const t=el('text',{x,y,class:cls||'tl','text-anchor':anchor||'middle'});t.textContent=s;svg.appendChild(t);}
 
-/* ---- Waterfall (floating bars): reported EBITDA -> adjusted ---- */
-function waterfall(){
-  const f=frame('cWaterfall',560,300,{l:48,r:12,t:16,b:52});
-  const {svg,w,h,pad}=f;
-  const steps=[
-    {l:'Reported',from:0,to:-10017,c:NEG},
-    {l:'A',from:-10017,to:31200,c:OLIVE},
-    {l:'B',from:31200,to:219462,c:OLIVE},
-    {l:'D',from:219462,to:219273,c:GREY},
-    {l:'E',from:219273,to:227670,c:OLIVE},
-    {l:'F',from:227670,to:236745,c:OLIVE},
-    {l:'Adj.',from:0,to:236745,c:GOLD}
-  ];
-  const min=-20000,max=250000;
-  const X=w-pad.l-pad.r, Y=h-pad.t-pad.b;
-  const sy=v=>pad.t+Y-((v-min)/(max-min))*Y;
-  // gridlines
-  for(let g=0;g<=5;g++){const v=min+(max-min)*g/5;const y=sy(v);
-    svg.appendChild(el('line',{x1:pad.l,y1:y,x2:w-pad.r,y2:y,class:'gl'}));
-    text(svg,pad.l-6,y+3,money(v),'vl','end');}
-  const bw=X/steps.length*0.62, gap=X/steps.length;
-  steps.forEach((s,i)=>{
-    const x=pad.l+gap*i+(gap-bw)/2;
-    const y1=sy(Math.max(s.from,s.to)), y2=sy(Math.min(s.from,s.to));
-    svg.appendChild(el('rect',{x,y:y1,width:bw,height:Math.max(2,y2-y1),rx:3,fill:s.c}));
-    text(svg,x+bw/2,h-pad.b+16,s.l,'tl');
+function clearCharts(){
+  ['cWaterfall','cMargin','cAdj','cRev','cSga'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '';
   });
 }
 
-/* ---- Line chart: gross margin trend ---- */
+function updateTabVisibility(){
+  // Keep all section tabs visible; missing data is displayed as a section message.
+  const activeTab = document.querySelector('#dashboard nav button.active');
+  if (!activeTab){
+    const firstButton = document.querySelector('#dashboard nav button');
+    if (firstButton) firstButton.classList.add('active');
+  }
+}
+
+function showSectionMessage(sectionId, message){
+  const section = document.getElementById(sectionId);
+  if (!section) return;
+  let msg = section.querySelector('.no-data-message');
+  if (!msg){
+    msg = document.createElement('div');
+    msg.className = 'no-data-message';
+    msg.style.margin = '0 0 18px';
+    msg.style.padding = '16px 18px';
+    msg.style.border = '1px solid #E0B966';
+    msg.style.background = '#fff8e8';
+    msg.style.borderRadius = '12px';
+    msg.style.color = '#5F4B00';
+    msg.style.fontSize = '13px';
+    section.insertBefore(msg, section.firstChild);
+  }
+  msg.textContent = message;
+  msg.classList.remove('hide');
+}
+
+function hideSectionMessage(sectionId){
+  const section = document.getElementById(sectionId);
+  if (!section) return;
+  const msg = section.querySelector('.no-data-message');
+  if (msg) msg.classList.add('hide');
+}
+
+function waterfall(){
+  const bridge = dashData.bridge || [];
+  if (!bridge.length) return; // No bridge data means no waterfall to draw.
+  const f=frame('cWaterfall',560,300,{l:48,r:12,t:16,b:52});
+  const {svg,w,h,pad}=f;
+  const reported = bridge.find(r => r.type === 'reported');
+  const adjustments = bridge.filter(r => r.type === 'adjustment');
+  const subtotal = bridge.filter(r => r.type === 'subtotal').pop();
+
+  const steps = [];
+  if (reported){
+    steps.push({label:'Reported', from:0, to:reported.cyValue, color: reported.cyValue < 0 ? NEG : INK});
+  }
+  let running = reported ? reported.cyValue : 0;
+  adjustments.forEach(adj => {
+    steps.push({
+      label: adj.ref || adj.label.substring(0,1),
+      from: running,
+      to: running + adj.cyValue,
+      color: adj.cyValue < 0 ? NEG : OLIVE
+    });
+    running += adj.cyValue;
+  });
+  if (subtotal){
+    steps.push({label:'Adj.', from:0, to:subtotal.cyValue, color:GOLD});
+  }
+
+  const values = steps.flatMap(s => [s.from, s.to]);
+  const min = Math.min(0, ...values);
+  const max = Math.max(...values);
+  const X = w - pad.l - pad.r, Y = h - pad.t - pad.b;
+  const sy = v => pad.t + Y - ((v - min) / (max - min)) * Y;
+
+  for(let g=0; g<=5; g++){
+    const v = min + (max - min) * g / 5;
+    const y = sy(v);
+    svg.appendChild(el('line',{x1:pad.l,y1:y,x2:w-pad.r,y2:y,class:'gl'}));
+    text(svg,pad.l-6,y+3,formatCurrency(v),'vl','end');
+  }
+
+  const bw = X / Math.max(1, steps.length) * 0.62;
+  const gap = X / Math.max(1, steps.length);
+  steps.forEach((s,i)=>{
+    const x = pad.l + gap * i + (gap - bw) / 2;
+    const y1 = sy(Math.max(s.from, s.to));
+    const y2 = sy(Math.min(s.from, s.to));
+    svg.appendChild(el('rect',{x,y:y1,width:bw,height:Math.max(2,y2-y1),rx:3,fill:s.color}));
+    text(svg,x+bw/2,h-pad.b+16,s.label,'tl');
+  });
+}
+
 function lineChart(){
   const f=frame('cMargin',560,300,{l:40,r:12,t:16,b:40});
   const {svg,w,h,pad}=f;
-  const months=['Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar'];
-  const val=[73.9,70.2,74.1,71.0,73.5,72.8,70.9,74.3,69.1,72.0,71.6,73.2];
-  const min=60,max=80, X=w-pad.l-pad.r, Y=h-pad.t-pad.b;
-  const sx=i=>pad.l+X*i/(months.length-1);
-  const sy=v=>pad.t+Y-((v-min)/(max-min))*Y;
-  for(let g=0;g<=4;g++){const v=min+(max-min)*g/4;const y=sy(v);
+  const series = dashData.marginSeries || [];
+  const months = series.map(row => row.month);
+  const values = series.map(row => Number(row.value)).filter(v => Number.isFinite(v));
+  const min = Math.min(0, ...values) - 2;
+  const max = Math.max(80, ...values) + 2;
+  const X = w - pad.l - pad.r, Y = h - pad.t - pad.b;
+  const sx = i => pad.l + X * i / Math.max(1, months.length - 1);
+  const sy = v => pad.t + Y - ((v - min) / (max - min)) * Y;
+
+  for(let g=0; g<=4; g++){
+    const v = min + (max - min) * g / 4;
+    const y = sy(v);
     svg.appendChild(el('line',{x1:pad.l,y1:y,x2:w-pad.r,y2:y,class:'gl'}));
-    text(svg,pad.l-6,y+3,v+'%','vl','end');}
-  let d='';const area=[];
-  val.forEach((v,i)=>{d+=(i?'L':'M')+sx(i)+' '+sy(v)+' ';});
-  const areaPath=d+`L${sx(val.length-1)} ${sy(min)} L${sx(0)} ${sy(min)} Z`;
+    text(svg,pad.l-6,y+3,isNaN(v) ? '-' : v.toFixed(1) + '%','vl','end');
+  }
+
+  let d='';
+  series.forEach((row,i)=>{
+    const value = Number(row.value);
+    d += (i ? 'L' : 'M') + sx(i) + ' ' + sy(value) + ' ';
+  });
+
+  const areaPath = d + `L${sx(series.length - 1)} ${sy(min)} L${sx(0)} ${sy(min)} Z`;
   svg.appendChild(el('path',{d:areaPath,fill:'rgba(244,168,49,.14)',stroke:'none'}));
   svg.appendChild(el('path',{d,fill:'none',stroke:GOLD,'stroke-width':2.5}));
-  val.forEach((v,i)=>{svg.appendChild(el('circle',{cx:sx(i),cy:sy(v),r:3,fill:OLIVE}));
-    text(svg,sx(i),h-pad.b+16,months[i],'tl');});
+
+  series.forEach((row,i)=>{
+    const x = sx(i);
+    const y = sy(Number(row.value));
+    svg.appendChild(el('circle',{cx:x,cy:y,r:3,fill:OLIVE}));
+    text(svg,x,h-pad.b+16,row.month,'tl');
+  });
 }
 
-/* ---- Horizontal bars: adjustment contribution ---- */
 function hbars(){
+  const rows = (dashData.bridge || []).filter(r => r.type === 'adjustment').map(r => ({label: r.ref ? r.ref + ' ' + r.label : r.label, value: r.cyValue}));
+  if (!rows.length) return; // No adjustment rows to display.
   const f=frame('cAdj',900,320,{l:130,r:40,t:10,b:30});
   const {svg,w,h,pad}=f;
-  const rows=[['A Nonrecur.',41217],['B DVM Comp',188262],['C Insurance',0],['D Rent',-189],['E Family',8397],['F Legal',9075],['G Disposal',0]];
-  const max=200000,min=-20000, X=w-pad.l-pad.r, Y=h-pad.t-pad.b;
-  const sx=v=>pad.l+((v-min)/(max-min))*X;
-  const zero=sx(0);
-  const bh=Y/rows.length*0.6, gap=Y/rows.length;
-  for(let g=0;g<=5;g++){const v=min+(max-min)*g/5;const x=sx(v);
+  const values = rows.map(r => r.value);
+  const min = Math.min(0, ...values);
+  const max = Math.max(...values);
+  const X = w - pad.l - pad.r, Y = h - pad.t - pad.b;
+  const sx = v => pad.l + ((v - min) / (max - min)) * X;
+  const zero = sx(0);
+  const bh = Y / Math.max(1, rows.length) * 0.6;
+  const gap = Y / Math.max(1, rows.length);
+
+  for(let g=0; g<=5; g++){
+    const v = min + (max - min) * g / 5;
+    const x = sx(v);
     svg.appendChild(el('line',{x1:x,y1:pad.t,x2:x,y2:h-pad.b,class:'gl'}));
-    text(svg,x,h-pad.b+18,money(v),'vl');}
-  rows.forEach((r,i)=>{
-    const y=pad.t+gap*i+(gap-bh)/2;
-    const x=r[1]>=0?zero:sx(r[1]);
-    svg.appendChild(el('rect',{x,y,width:Math.max(2,Math.abs(sx(r[1])-zero)),height:bh,rx:3,fill:r[1]<0?NEG:OLIVE}));
-    text(svg,pad.l-8,y+bh/2+4,r[0],'tl','end');
+    text(svg,x,h-pad.b+18,formatCurrency(v),'vl');
+  }
+
+  rows.forEach((row,i)=>{
+    const y = pad.t + gap * i + (gap - bh) / 2;
+    const x = row.value >= 0 ? zero : sx(row.value);
+    svg.appendChild(el('rect',{x,y,width:Math.max(2,Math.abs(sx(row.value) - zero)),height:bh,rx:3,fill:row.value < 0 ? NEG : OLIVE}));
+    text(svg,pad.l-8,y+bh/2+4,row.label,'tl','end');
   });
 }
 
-/* ---- Grouped bars: revenue vs gross profit ---- */
 function groupedBars(){
+  const revenue = dashData.revenue.revenue;
+  const grossProfit = dashData.revenue.grossProfit;
+  if (!revenue || !grossProfit){
+    showSectionMessage('revenue', 'Revenue comparison data is not available. Please include RevenueMargin values in DASH_FEED.');
+    return;
+  }
+  hideSectionMessage('revenue');
   const f=frame('cRev',900,320,{l:60,r:20,t:16,b:40});
   const {svg,w,h,pad}=f;
-  const cats=['TTM Mar-25','TTM Mar-26'];
-  const rev=[2568154,2621078], gp=[1912001,1885656];
-  const max=2800000, X=w-pad.l-pad.r, Y=h-pad.t-pad.b;
-  const sy=v=>pad.t+Y-(v/max)*Y;
-  for(let g=0;g<=4;g++){const v=max*g/4;const y=sy(v);
+  const pyLabel = dashData.meta.periodPY || 'PY';
+  const cyLabel = dashData.meta.periodCY || 'CY';
+  const rev = [revenue.pyValue, revenue.cyValue];
+  const gp = [grossProfit.pyValue, grossProfit.cyValue];
+  const cats = [pyLabel, cyLabel];
+  const maxVal = Math.max(...rev, ...gp, 1);
+  const X = w - pad.l - pad.r, Y = h - pad.t - pad.b;
+  const sy = v => pad.t + Y - (v / maxVal) * Y;
+
+  for(let g=0; g<=4; g++){
+    const v = maxVal * g / 4;
+    const y = sy(v);
     svg.appendChild(el('line',{x1:pad.l,y1:y,x2:w-pad.r,y2:y,class:'gl'}));
-    text(svg,pad.l-6,y+3,'$'+(v/1000000).toFixed(1)+'M','vl','end');}
-  const gw=X/cats.length, bw=gw*0.3;
-  cats.forEach((c,i)=>{
-    const cx=pad.l+gw*i+gw/2;
+    text(svg,pad.l-6,y+3,formatCurrency(v),'vl','end');
+  }
+
+  const gw = X / cats.length;
+  const bw = gw * 0.3;
+  cats.forEach((label,i)=>{
+    const cx = pad.l + gw * i + gw/2;
     svg.appendChild(el('rect',{x:cx-bw-4,y:sy(rev[i]),width:bw,height:Y-(sy(rev[i])-pad.t),rx:3,fill:INK}));
     svg.appendChild(el('rect',{x:cx+4,y:sy(gp[i]),width:bw,height:Y-(sy(gp[i])-pad.t),rx:3,fill:GOLD}));
-    text(svg,cx,h-pad.b+18,c,'tl');
+    text(svg,cx,h-pad.b+18,label,'tl');
   });
-  const lg=document.createElement('div');lg.className='legend';
-  lg.innerHTML='<span><i style="background:'+INK+'"></i>Revenue</span><span><i style="background:'+GOLD+'"></i>Gross Profit</span>';
+  const lg = document.createElement('div'); lg.className='legend';
+  lg.innerHTML = '<span><i style="background:'+INK+'"></i>Revenue</span><span><i style="background:'+GOLD+'"></i>Gross Profit</span>';
   document.getElementById('cRev').appendChild(lg);
 }
 
-/* ---- Donut: SG&A / opex mix ---- */
 function donut(){
+  const sgaRows = Array.isArray(dashData.sga) ? dashData.sga : [];
+  if (!sgaRows.length){
+    showSectionMessage('sga', 'SG&A mix data is not available. Please add SG&A rows to DASH_FEED.');
+    return;
+  }
+  hideSectionMessage('sga');
   const f=frame('cSga',900,340,{});
   const {svg,w,h}=f;
-  const data=[['Labor - DVM',563795,INK],['Labor - Staff',621863,GOLD],['Labor & Fringe',181370,OLIVE],
-    ['Facility & Equip',143254,'#B8892F'],['Admin',88385,'#6B6B63'],['Fee/Collection',60779,'#A9A995'],
-    ['Marketing',22442,'#E7C77A'],['D&A',66388,GREY]];
-  const total=data.reduce((s,d)=>s+d[1],0);
-  const cx=200,cy=170,r=120,ir=64;
+  const palette=[INK,GOLD,OLIVE,'#B8892F','#6B6B63','#A9A995','#E7C77A',GREY];
+  const data = sgaRows.map((row,i)=>({
+    label: row.category,
+    value: row.adjustedValueCY,
+    color: palette[i % palette.length]
+  }));
+  const total = data.reduce((sum,item) => sum + item.value, 0);
+  const cx=200, cy=170, r=120, ir=64;
   let a=-Math.PI/2;
-  data.forEach(d=>{
-    const ang=d[1]/total*Math.PI*2, a2=a+ang;
-    const x1=cx+r*Math.cos(a),y1=cy+r*Math.sin(a),x2=cx+r*Math.cos(a2),y2=cy+r*Math.sin(a2);
-    const xi1=cx+ir*Math.cos(a2),yi1=cy+ir*Math.sin(a2),xi2=cx+ir*Math.cos(a),yi2=cy+ir*Math.sin(a);
-    const large=ang>Math.PI?1:0;
-    const path=`M${x1} ${y1} A${r} ${r} 0 ${large} 1 ${x2} ${y2} L${xi1} ${yi1} A${ir} ${ir} 0 ${large} 0 ${xi2} ${yi2} Z`;
-    svg.appendChild(el('path',{d:path,fill:d[2]}));
-    a=a2;
+  data.forEach(item => {
+    const ang = item.value / total * Math.PI * 2;
+    const a2 = a + ang;
+    const x1 = cx + r * Math.cos(a), y1 = cy + r * Math.sin(a);
+    const x2 = cx + r * Math.cos(a2), y2 = cy + r * Math.sin(a2);
+    const xi1 = cx + ir * Math.cos(a2), yi1 = cy + ir * Math.sin(a2);
+    const xi2 = cx + ir * Math.cos(a), yi2 = cy + ir * Math.sin(a);
+    const large = ang > Math.PI ? 1 : 0;
+    const path = `M${x1} ${y1} A${r} ${r} 0 ${large} 1 ${x2} ${y2} L${xi1} ${yi1} A${ir} ${ir} 0 ${large} 0 ${xi2} ${yi2} Z`;
+    svg.appendChild(el('path',{d:path,fill:item.color}));
+    a = a2;
   });
-  // legend on right
-  data.forEach((d,i)=>{
-    const y=44+i*34;
-    svg.appendChild(el('rect',{x:430,y:y-11,width:13,height:13,rx:3,fill:d[2]}));
-    text(svg,452,y,d[0],'tl','start');
-    text(svg,880,y,money(d[1])+'  ('+(d[1]/total*100).toFixed(1)+'%)','vl','end');
+  data.forEach((item,i) => {
+    const y = 44 + i * 34;
+    svg.appendChild(el('rect',{x:430,y:y-11,width:13,height:13,rx:3,fill:item.color}));
+    text(svg,452,y,item.label,'tl','start');
+    text(svg,880,y,formatCurrency(item.value) + '  (' + (total ? (item.value / total * 100).toFixed(1) : '0.0') + '%)','vl','end');
   });
 }
 
-waterfall();lineChart();hbars();groupedBars();donut();
+function renderBridgeTable(){
+  const body = document.getElementById('bridgeBody');
+  body.innerHTML = '';
+  if (!Array.isArray(dashData.bridge) || dashData.bridge.length === 0){
+    showSectionMessage('bridge', 'Bridge data is not available for this workbook. Please include a valid Bridge section in DASH_FEED.');
+    return;
+  }
+  hideSectionMessage('bridge');
+  dashData.bridge.forEach(row => {
+    const tr = document.createElement('tr');
+    if (row.type === 'adjustment') tr.className = 'adj';
+    if (row.type === 'subtotal') tr.className = 'tot';
+    tr.innerHTML = `<td>${row.label}</td><td>${row.ref || ''}</td><td>${formatCurrency(row.pyValue)}</td><td>${formatCurrency(row.cyValue)}</td>`;
+    body.appendChild(tr);
+  });
+}
+
+function renderKpis(){
+  const clientLabel = document.getElementById('clientLabel');
+  clientLabel.textContent = `${dashData.meta.clientName} · ${dashData.meta.periodCY}`;
+  const py = dashData.meta.periodPY;
+  const cy = dashData.meta.periodCY;
+  document.getElementById('kpiRevenueLabel').textContent = `Revenue (${cy})`;
+  document.getElementById('kpiRevenueValue').textContent = formatCurrency(dashData.kpis.revenue.cyValue);
+  document.getElementById('kpiRevenueSub').textContent = `vs. ${py}`;
+  document.getElementById('kpiEbitdaValue').textContent = formatCurrency(dashData.kpis.diligenceAdjEbitda.cyValue);
+  document.getElementById('kpiEbitdaSub').textContent = `vs. ${formatCurrency(dashData.kpis.diligenceAdjEbitda.pyValue)} ${py}`;
+  document.getElementById('kpiMarginValue').textContent = formatPercent(dashData.kpis.adjEbitdaMargin.cyValue);
+  document.getElementById('kpiMarginSub').textContent = `${formatPercent(dashData.kpis.adjEbitdaMargin.pyValue)} in ${py}`;
+  document.getElementById('kpiMultipleValue').textContent = dashData.kpis.impliedMultiple.cyValue.toFixed(1) + 'x';
+  document.getElementById('kpiMultipleSub').textContent = `on ${formatCurrency(dashData.meta.purchasePrice)} cash purchase price`;
+}
+
+function renderKeyFindings(){
+  const list = document.getElementById('keyFindingsList');
+  list.innerHTML = '';
+  if (!Array.isArray(dashData.keyFindings) || dashData.keyFindings.length === 0){
+    showSectionMessage('overview', 'Key findings are not available. Please add at least one finding to the DASH_FEED Key Findings section.');
+    return;
+  }
+  hideSectionMessage('overview');
+  dashData.keyFindings.forEach(item => {
+    const li = document.createElement('li');
+    li.textContent = item;
+    list.appendChild(li);
+  });
+}
+
+function renderRevenueTables(){
+  const summary = document.getElementById('revSummaryBody');
+  const margin = document.getElementById('revMarginBody');
+  summary.innerHTML = '';
+  margin.innerHTML = '';
+  const revenue = dashData.revenue.revenue;
+  const cogs = dashData.revenue.cogs;
+  const gross = dashData.revenue.grossProfit;
+  if (!revenue || !cogs || !gross){
+    showSectionMessage('revenue', 'Revenue and margin data is missing. Please include RevenueMargin values in DASH_FEED.');
+    return;
+  }
+  hideSectionMessage('revenue');
+  const py = dashData.meta.periodPY;
+  const cy = dashData.meta.periodCY;
+  const change = revenue.cyValue - revenue.pyValue;
+  const changePct = revenue.pyValue ? (change / revenue.pyValue * 100) : NaN;
+  const grossMarginPY = revenue.pyValue ? gross.pyValue / revenue.pyValue * 100 : NaN;
+  const grossMarginCY = revenue.cyValue ? gross.cyValue / revenue.cyValue * 100 : NaN;
+
+  summary.innerHTML = `
+    <tr><td>${py}</td><td>${formatCurrency(revenue.pyValue)}</td></tr>
+    <tr><td>${cy}</td><td>${formatCurrency(revenue.cyValue)}</td></tr>
+    <tr class="tot"><td>Change</td><td>${formatCurrency(change)} (${formatPercent(changePct)})</td></tr>
+  `;
+  margin.innerHTML = `
+    <tr><td>COGS ${cy}</td><td>${formatCurrency(cogs.cyValue)}</td></tr>
+    <tr><td>Gross Profit ${cy}</td><td>${formatCurrency(gross.cyValue)}</td></tr>
+    <tr class="tot"><td>Gross Margin</td><td>${formatPercent(grossMarginCY)} (was ${formatPercent(grossMarginPY)})</td></tr>
+  `;
+}
+
+function renderDashboard(){
+  // Central dashboard render path: update metrics, tables, and SVG charts.
+  clearCharts();
+  renderKpis();
+  renderKeyFindings();
+  renderBridgeTable();
+  renderRevenueTables();
+  updateTabVisibility();
+  waterfall();
+  lineChart();
+  hbars();
+  groupedBars();
+  if (Array.isArray(dashData.sga) && dashData.sga.length) donut();
+}
+
+const resizeDashboard = (function(){
+  let timeout = null;
+  return () => {
+    if (timeout) clearTimeout(timeout);
+    timeout = setTimeout(()=>{
+      if (dashData) renderDashboard();
+    }, 120);
+  };
+})();
+window.addEventListener('resize', resizeDashboard);
 
 /* tab switching (runs after charts so SVG exists) */
-document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
-  document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));
+document.querySelectorAll('#dashboard nav button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#dashboard nav button').forEach(x=>x.classList.remove('active'));
   b.classList.add('active');
-  document.querySelectorAll('main section').forEach(s=>s.classList.add('hide'));
+  document.querySelectorAll('#dashboard main section').forEach(s=>s.classList.add('hide'));
   document.getElementById(b.dataset.tab).classList.remove('hide');
 });
+
+function showDashboard(){
+  document.getElementById('uploadState').classList.add('hide');
+  document.getElementById('dashboard').classList.remove('hide');
+}
+
+function showUploadState(){
+  // Reset upload view and clear prior dashboard state.
+  document.getElementById('dashboard').classList.add('hide');
+  document.getElementById('uploadState').classList.remove('hide');
+  document.getElementById('fileInput').value = '';
+  setUploadError('');
+  document.querySelectorAll('#dashboard nav button').forEach((btn, idx)=>{
+    btn.classList.toggle('active', idx===0);
+  });
+  document.querySelectorAll('#dashboard main section').forEach((section, idx)=>{
+    section.classList.toggle('hide', idx!==0);
+  });
+}
+
+function setUploadError(message){
+  const errorEl = document.getElementById('uploadError');
+  errorEl.textContent = message;
+  errorEl.classList.toggle('hide', !message);
+}
+
+function normalizeKey(value){
+  return String(value || '').trim().toLowerCase();
+}
+
+function sheetToRows(sheet){
+  const rows = XLSX.utils.sheet_to_json(sheet, {header:1, blankrows:true});
+  return rows.map(r => Array.isArray(r) ? r : [r]).map(r => r.map(v => v===undefined || v===null ? '' : v));
+}
+
+function findSection(rows, marker){
+  return rows.findIndex(r => normalizeKey(r[0]) === normalizeKey(marker));
+}
+
+function parseSection(rows, startIndex){
+  const markers = new Set(['meta','kpis','bridge','revenuemargin','gross margin months','sg&a','key findings']);
+  const section = [];
+  for (let i = startIndex + 1; i < rows.length; i++){
+    const key = normalizeKey(rows[i][0]);
+    if (markers.has(key)) break;
+    if (rows[i].every(cell => cell === '')) continue;
+    section.push(rows[i]);
+  }
+  return section;
+}
+
+// Parse the DASH_FEED sheet into a structured dashData object.
+// Convert DASH_FEED worksheet rows into a structured dashboard data object.
+function parseDashFeed(sheet){
+  const rows = sheetToRows(sheet);
+  const dashData = {
+    meta: {},
+    kpis: {},
+    bridge: [],
+    revenue: {},
+    marginSeries: [],
+    sga: [],
+    keyFindings: []
+  };
+
+  const metaRows = parseSection(rows, findSection(rows,'Meta'));
+  metaRows.forEach(row=>{
+    const key = normalizeKey(row[0]);
+    const value = row[1];
+    if (key === 'client name') dashData.meta.clientName = String(value || '').trim();
+    if (key === 'period py') dashData.meta.periodPY = String(value || '').trim();
+    if (key === 'period cy') dashData.meta.periodCY = String(value || '').trim();
+    if (key === 'purchase price') dashData.meta.purchasePrice = Number(value);
+  });
+
+  const kpiRows = parseSection(rows, findSection(rows,'KPIs'));
+  kpiRows.forEach(row=>{
+    const key = normalizeKey(row[0]);
+    if (!key) return;
+    const py = Number(row[1]);
+    const cy = Number(row[2]);
+    if (key === 'revenue') dashData.kpis.revenue = {pyValue: py, cyValue: cy};
+    if (key === 'diligence adj ebitda' || key === 'diligence adjusted ebitda') dashData.kpis.diligenceAdjEbitda = {pyValue: py, cyValue: cy};
+    if (key === 'adj ebitda margin' || key === 'adj. ebitda margin') dashData.kpis.adjEbitdaMargin = {pyValue: Number(row[1]), cyValue: Number(row[2])};
+    if (key === 'implied multiple') dashData.kpis.impliedMultiple = {pyValue: py, cyValue: cy};
+  });
+
+  const bridgeRows = parseSection(rows, findSection(rows,'Bridge'));
+  bridgeRows.forEach(row=>{
+    if (!row[0]) return;
+    dashData.bridge.push({
+      label: String(row[0]).trim(),
+      ref: String(row[1] || '').trim(),
+      pyValue: Number(row[2]),
+      cyValue: Number(row[3]),
+      type: String(row[4] || '').trim().toLowerCase()
+    });
+  });
+
+  const revenueRows = parseSection(rows, findSection(rows,'RevenueMargin'));
+  revenueRows.forEach(row=>{
+    const key = normalizeKey(row[0]);
+    if (!key) return;
+    const py = Number(row[1]);
+    const cy = Number(row[2]);
+    if (key === 'revenue') dashData.revenue.revenue = {pyValue: py, cyValue: cy};
+    if (key === 'cogs') dashData.revenue.cogs = {pyValue: py, cyValue: cy};
+    if (key === 'gross profit') dashData.revenue.grossProfit = {pyValue: py, cyValue: cy};
+  });
+
+  const marginRows = parseSection(rows, findSection(rows,'Gross Margin Months'));
+  marginRows.forEach(row=>{
+    if (!row[0]) return;
+    const month = String(row[0]).trim();
+    const value = Number(row[1]);
+    dashData.marginSeries.push({month, value});
+  });
+
+  const sgaRows = parseSection(rows, findSection(rows,'SG&A'));
+  sgaRows.forEach(row=>{
+    if (!row[0]) return;
+    dashData.sga.push({category: String(row[0]).trim(), adjustedValueCY: Number(row[1])});
+  });
+
+  const findingsRows = parseSection(rows, findSection(rows,'Key Findings'));
+  findingsRows.forEach(row=>{
+    if (!row[1]) return;
+    dashData.keyFindings.push(String(row[1]).trim());
+  });
+
+  return dashData;
+}
+
+// Validate the parsed workbook data so rendering only happens on a consistent schema.
+// Validate parsed dashboard data against required sections and numeric fields.
+function validate(dashData){
+  const errors = [];
+  if (!dashData || typeof dashData !== 'object') return ['Missing dashData object'];
+  const meta = dashData.meta || {};
+  if (!meta.clientName) errors.push('Meta.clientName is required');
+  if (!meta.periodPY) errors.push('Meta.periodPY is required');
+  if (!meta.periodCY) errors.push('Meta.periodCY is required');
+  if (!Number.isFinite(meta.purchasePrice)) errors.push('Meta.purchasePrice must be a number');
+
+  const kpis = dashData.kpis || {};
+  if (!kpis.revenue || !Number.isFinite(kpis.revenue.pyValue) || !Number.isFinite(kpis.revenue.cyValue)) errors.push('KPIs.revenue must include numeric PY and CY values');
+  if (!kpis.diligenceAdjEbitda || !Number.isFinite(kpis.diligenceAdjEbitda.pyValue) || !Number.isFinite(kpis.diligenceAdjEbitda.cyValue)) errors.push('KPIs.diligenceAdjEbitda must include numeric PY and CY values');
+  if (!kpis.adjEbitdaMargin || !Number.isFinite(kpis.adjEbitdaMargin.pyValue) || !Number.isFinite(kpis.adjEbitdaMargin.cyValue)) errors.push('KPIs.adjEbitdaMargin must include numeric PY and CY values');
+  if (!kpis.impliedMultiple || !Number.isFinite(kpis.impliedMultiple.pyValue) || !Number.isFinite(kpis.impliedMultiple.cyValue)) errors.push('KPIs.impliedMultiple must include numeric PY and CY values');
+
+  if (!Array.isArray(dashData.bridge) || dashData.bridge.length === 0) errors.push('Bridge must include at least one row');
+  else dashData.bridge.forEach((row,i)=>{
+    if (!row.label) errors.push(`Bridge row ${i+1} missing label`);
+    if (!Number.isFinite(row.pyValue)) errors.push(`Bridge row ${i+1} PY value must be numeric`);
+    if (!Number.isFinite(row.cyValue)) errors.push(`Bridge row ${i+1} CY value must be numeric`);
+    if (!['reported','adjustment','subtotal'].includes(row.type)) errors.push(`Bridge row ${i+1} type must be reported, adjustment, or subtotal`);
+  });
+
+  const revenue = dashData.revenue || {};
+  if (!revenue.revenue || !Number.isFinite(revenue.revenue.pyValue) || !Number.isFinite(revenue.revenue.cyValue)) errors.push('Revenue section must include numeric revenue PY and CY values');
+  if (!revenue.cogs || !Number.isFinite(revenue.cogs.pyValue) || !Number.isFinite(revenue.cogs.cyValue)) errors.push('Revenue section must include numeric COGS PY and CY values');
+  if (!revenue.grossProfit || !Number.isFinite(revenue.grossProfit.pyValue) || !Number.isFinite(revenue.grossProfit.cyValue)) errors.push('Revenue section must include numeric gross profit PY and CY values');
+
+  if (!Array.isArray(dashData.marginSeries) || dashData.marginSeries.length !== 12) errors.push('Gross margin series must include 12 rows');
+  else dashData.marginSeries.forEach((row,i)=>{ if (!row.month) errors.push(`Gross margin row ${i+1} missing month`); if (!Number.isFinite(row.value)) errors.push(`Gross margin row ${i+1} value must be numeric`); });
+
+  if (Array.isArray(dashData.sga) && dashData.sga.length){
+    dashData.sga.forEach((row,i)=>{
+      if (!row.category) errors.push(`SG&A row ${i+1} missing category`);
+      if (!Number.isFinite(row.adjustedValueCY)) errors.push(`SG&A row ${i+1} adjusted_value_cy must be numeric`);
+    });
+  }
+
+  if (!Array.isArray(dashData.keyFindings) || dashData.keyFindings.length === 0) errors.push('Key Findings must include at least one finding');
+  return errors;
+}
+
+let dashData = null;
+
+function handleFile(file){
+  // Validate file type and parse the uploaded workbook into dashData.
+  setUploadError('');
+  if (!file.name.toLowerCase().endsWith('.xlsx')){
+    setUploadError('Please upload a valid .xlsx file containing a DASH_FEED worksheet.');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    try {
+      const data = new Uint8Array(event.target.result);
+      const workbook = XLSX.read(data, {type:'array'});
+      if (!workbook || !workbook.Sheets){
+        throw new Error('Unable to read workbook structure.');
+      }
+      const sheet = workbook.Sheets['DASH_FEED'];
+      if (!sheet) throw new Error('Workbook does not contain a sheet named DASH_FEED.');
+      dashData = parseDashFeed(sheet);
+      const errors = validate(dashData);
+      if (errors.length){
+        setUploadError('Workbook validation failed. Please confirm the DASH_FEED schema and fix these items: ' + errors.join('; '));
+        return;
+      }
+      console.log('dashData', dashData);
+      renderDashboard();
+      showDashboard();
+    } catch (error) {
+      setUploadError('Unable to parse workbook. Please ensure DASH_FEED is formatted correctly. ' + error.message);
+    }
+  };
+  reader.onerror = () => {
+    setUploadError('Unable to read the selected file. Please try again.');
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+const uploadArea = document.getElementById('uploadArea');
+const fileInput = document.getElementById('fileInput');
+const browseFile = document.getElementById('browseFile');
+const resetFile = document.getElementById('resetFile');
+
+browseFile.addEventListener('click', ()=>fileInput.click());
+resetFile.addEventListener('click', showUploadState);
+
+uploadArea.addEventListener('click', ()=>fileInput.click());
+uploadArea.addEventListener('dragover', e=>{
+  e.preventDefault();
+  uploadArea.classList.add('dragover');
+});
+uploadArea.addEventListener('dragleave', ()=>{
+  uploadArea.classList.remove('dragover');
+});
+uploadArea.addEventListener('drop', e=>{
+  e.preventDefault();
+  uploadArea.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) {
+    fileInput.files = e.dataTransfer.files;
+    handleFile(file);
+  }
+});
+
+fileInput.addEventListener('change', ()=>{
+  if (fileInput.files && fileInput.files.length > 0) {
+    handleFile(fileInput.files[0]);
+  }
+});
+
+// initialize the default state
+showUploadState();
 </script>
 </body>
 </html>
