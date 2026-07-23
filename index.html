@@ -577,9 +577,28 @@ function normalizeKey(value){
   return String(value || '').trim().toLowerCase();
 }
 
+function getCellValue(sheet, row, col){
+  const address = XLSX.utils.encode_cell({r: row, c: col});
+  const cell = sheet[address];
+  if (!cell) return '';
+  return String(cell.v === undefined || cell.v === null ? '' : cell.v).trim();
+}
+
+function parseSheetRows(sheet){
+  const range = sheet['!ref'] ? XLSX.utils.decode_range(sheet['!ref']) : {s:{r:0,c:0}, e:{r:0,c:0}};
+  const rows = [];
+  for (let r = range.s.r; r <= range.e.r; r++){
+    const row = [];
+    for (let c = range.s.c; c <= range.e.c; c++){
+      row.push(getCellValue(sheet, r, c));
+    }
+    rows.push(row);
+  }
+  return rows;
+}
+
 function sheetToRows(sheet){
-  const rows = XLSX.utils.sheet_to_json(sheet, {header:1, blankrows:true});
-  return rows.map(r => Array.isArray(r) ? r : [r]).map(r => r.map(v => v===undefined || v===null ? '' : v));
+  return parseSheetRows(sheet);
 }
 
 const SECTION_TAGS = new Set(['[meta]','[kpis]','[bridge]','[revenue_margin]','[margin_series]','[gross_margin_months]','[sga_mix]','[key_findings]']);
@@ -649,23 +668,28 @@ function parseDashFeed(sheet){
   metaRows.forEach(row => {
     const key = normalizeKey(row[0]);
     const value = row[1];
-    if (key === 'client name') dashData.meta.clientName = String(value || '').trim();
-    if (key === 'period py') dashData.meta.periodPY = String(value || '').trim();
-    if (key === 'period cy') dashData.meta.periodCY = String(value || '').trim();
-    if (key === 'purchase price') dashData.meta.purchasePrice = Number(value);
+    if (key === 'client_name') dashData.meta.clientName = String(value || '').trim();
+    if (key === 'period_py_label') dashData.meta.periodPY = String(value || '').trim();
+    if (key === 'period_cy_label') dashData.meta.periodCY = String(value || '').trim();
+    if (key === 'purchase_price') dashData.meta.purchasePrice = Number(value);
+    if (key === 'location') dashData.meta.location = String(value || '').trim();
   });
 
   const kpiRows = parseSection(rows, sectionIndexes.kpis);
   if (kpiRows.length && normalizeKey(kpiRows[0][0]) === 'metric') kpiRows.shift();
   kpiRows.forEach(row => {
-    const label = normalizeKey(row[0]);
-    const py = Number(row[1]);
-    const cy = Number(row[2]);
-    if (!label) return;
-    if (label === 'revenue') dashData.kpis.revenue = {pyValue: py, cyValue: cy};
-    if (label === 'diligence adj ebitda' || label === 'diligence adjusted ebitda') dashData.kpis.diligenceAdjEbitda = {pyValue: py, cyValue: cy};
-    if (label === 'adj ebitda margin' || label === 'adj. ebitda margin') dashData.kpis.adjEbitdaMargin = {pyValue: py, cyValue: cy};
-    if (label === 'implied multiple') dashData.kpis.impliedMultiple = {pyValue: py, cyValue: cy};
+    const key = normalizeKey(row[0]);
+    const value = Number(row[1]);
+    if (!key) return;
+    if (key === 'revenue_py') dashData.kpis.revenue = {...dashData.kpis.revenue, pyValue: value};
+    if (key === 'revenue_cy') dashData.kpis.revenue = {...dashData.kpis.revenue, cyValue: value};
+    if (key === 'cogs_py') dashData.kpis.cogs = {...dashData.kpis.cogs, pyValue: value};
+    if (key === 'cogs_cy') dashData.kpis.cogs = {...dashData.kpis.cogs, cyValue: value};
+    if (key === 'adj_ebitda_py') dashData.kpis.diligenceAdjEbitda = {...dashData.kpis.diligenceAdjEbitda, pyValue: value};
+    if (key === 'adj_ebitda_cy') dashData.kpis.diligenceAdjEbitda = {...dashData.kpis.diligenceAdjEbitda, cyValue: value};
+    if (key === 'adj_margin_py') dashData.kpis.adjEbitdaMargin = {...dashData.kpis.adjEbitdaMargin, pyValue: value};
+    if (key === 'adj_margin_cy') dashData.kpis.adjEbitdaMargin = {...dashData.kpis.adjEbitdaMargin, cyValue: value};
+    if (key === 'implied_multiple_cy') dashData.kpis.impliedMultiple = {pyValue: NaN, cyValue: value};
   });
 
   const bridgeRows = parseSection(rows, sectionIndexes.bridge);
@@ -796,6 +820,7 @@ function handleFile(file){
       const sheet = workbook.Sheets['DASH_FEED'];
       if (!sheet) throw new Error('Workbook does not contain a sheet named DASH_FEED.');
       dashData = parseDashFeed(sheet);
+      console.log('Parsed dashData from DASH_FEED:', dashData);
       const errors = validate(dashData);
       if (errors.length){
         setUploadError('Workbook validation failed. Please confirm the DASH_FEED schema and fix these items: ' + errors.join('; '));
