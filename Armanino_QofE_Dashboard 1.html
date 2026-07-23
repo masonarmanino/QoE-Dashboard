@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Armanino · QofE Dashboard — Poolesville Veterinary Clinic (Prototype)</title>
+<style>
+  :root{
+    --ink:#222222;         /* Mine Shaft */
+    --gold:#F4A831;        /* Sea Buckthorn */
+    --olive:#898A38;       /* Sycamore */
+    --paper:#F7F7F4;
+    --card:#FFFFFF;
+    --line:#E7E7E1;
+    --muted:#6B6B63;
+    --pos:#4F7A28;
+    --neg:#C0532B;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Segoe UI',system-ui,-apple-system,Arial,sans-serif;background:var(--paper);color:var(--ink);}
+  header{background:var(--ink);color:#fff;padding:18px 28px;display:flex;align-items:center;justify-content:space-between;}
+  .brand{display:flex;align-items:center;gap:14px;}
+  .mark{display:flex;gap:3px;}
+  .mark span{width:0;height:0;border-left:9px solid transparent;border-right:9px solid transparent;}
+  .t-gold{border-bottom:16px solid var(--gold);}
+  .t-olive{border-bottom:16px solid var(--olive);}
+  .t-ink{border-bottom:16px solid #fff;}
+  .brand h1{font-size:18px;margin:0;font-weight:600;letter-spacing:.3px;}
+  .brand small{display:block;color:#c9c9c2;font-weight:400;font-size:12px;margin-top:2px;}
+  .badge{background:var(--gold);color:var(--ink);font-size:11px;font-weight:700;padding:5px 10px;border-radius:20px;text-transform:uppercase;letter-spacing:.5px;}
+  nav{display:flex;gap:4px;background:#fff;padding:0 28px;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5;flex-wrap:wrap;}
+  nav button{background:none;border:none;padding:14px 18px;font-size:14px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;}
+  nav button.active{color:var(--ink);border-bottom-color:var(--gold);}
+  main{padding:24px 28px 60px;max-width:1200px;margin:0 auto;}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:22px;}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;box-shadow:0 1px 3px rgba(0,0,0,.03);}
+  .kpi .lbl{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;}
+  .kpi .val{font-size:26px;font-weight:700;margin-top:8px;}
+  .kpi .sub{font-size:12px;margin-top:6px;color:var(--muted);}
+  .kpi .up{color:var(--pos);font-weight:600;}
+  .kpi .down{color:var(--neg);font-weight:600;}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.03);}
+  .card h3{margin:0 0 4px;font-size:15px;}
+  .card .cap{font-size:12px;color:var(--muted);margin-bottom:14px;}
+  .full{grid-column:1 / -1;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th,td{padding:9px 8px;text-align:right;border-bottom:1px solid var(--line);}
+  th:first-child,td:first-child{text-align:left;}
+  thead th{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.4px;}
+  tr.tot td{font-weight:700;border-top:2px solid var(--ink);}
+  tr.adj td:first-child{padding-left:22px;color:var(--muted);}
+  .chip{display:inline-block;width:22px;height:22px;border-radius:6px;background:var(--olive);color:#fff;text-align:center;line-height:22px;font-size:11px;font-weight:700;margin-right:8px;}
+  .hide{display:none;}
+  footer{color:var(--muted);font-size:11px;text-align:center;padding:24px;}
+  .legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:12px;font-size:12px;color:#444;}
+  .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:middle;}
+  svg{width:100%;height:auto;display:block;}
+  .axis{stroke:var(--line);stroke-width:1;}
+  .gl{stroke:#EFEFE9;stroke-width:1;}
+  .tl{fill:var(--muted);font-size:11px;}
+  .vl{fill:var(--muted);font-size:10px;}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="mark"><span class="t-gold"></span><span class="t-olive"></span><span class="t-ink"></span></div>
+    <div>
+      <h1>armanino</h1>
+      <small>Transaction Advisory · Quality of Earnings</small>
+    </div>
+  </div>
+  <div style="text-align:right">
+    <span class="badge">Prototype</span>
+    <div style="font-size:12px;color:#c9c9c2;margin-top:8px">Poolesville Veterinary Clinic · TTM Mar-26</div>
+  </div>
+</header>
+
+<nav>
+  <button class="active" data-tab="overview">Overview</button>
+  <button data-tab="bridge">EBITDA Bridge</button>
+  <button data-tab="revenue">Revenue &amp; Margin</button>
+  <button data-tab="sga">SG&amp;A</button>
+</nav>
+
+<main>
+  <!-- OVERVIEW -->
+  <section id="overview">
+    <div class="kpis">
+      <div class="kpi"><div class="lbl">Revenue (TTM Mar-26)</div><div class="val">$2.62M</div><div class="sub"><span class="up">▲ 2.1%</span> vs. TTM Mar-25</div></div>
+      <div class="kpi"><div class="lbl">Diligence Adj. EBITDA</div><div class="val">$236.7K</div><div class="sub"><span class="down">▼ 16.2%</span> vs. $282.6K PY</div></div>
+      <div class="kpi"><div class="lbl">Adj. EBITDA Margin</div><div class="val">9.0%</div><div class="sub">11.0% in TTM Mar-25</div></div>
+      <div class="kpi"><div class="lbl">Implied Multiple</div><div class="val">16.9x</div><div class="sub">on $4.0M cash purchase price</div></div>
+    </div>
+    <div class="grid">
+      <div class="card"><h3>EBITDA: Reported → Adjusted</h3><div class="cap">Seller &amp; diligence adjustments, TTM Mar-26</div><div id="cWaterfall"></div></div>
+      <div class="card"><h3>Gross Margin Trend</h3><div class="cap">Monthly, cash-basis inventory drives swings</div><div id="cMargin"></div></div>
+      <div class="card full"><h3>Key Findings at a glance</h3><div class="cap">Auto-surfaced from the Key Findings tab</div>
+        <ul style="font-size:13px;line-height:1.7;color:#444;margin:0;padding-left:18px">
+          <li>Dr. Eeg (owner) moves to <strong>20% of production</strong> post-close; comp normalized in Adjustment B.</li>
+          <li><strong>~2.5% gross-margin decline</strong> Mar-25 → Mar-26, attributed to IDEXX price increases &amp; higher 1099 relief-vet use.</li>
+          <li>CareVet valuation revised: FY25 Adj. EBITDA <strong>$350K → $250K</strong> after ~$100K revenue reduction (discounts/rebates).</li>
+          <li>Cash proof analysis for the twelve months ended Mar-26 nets to a <strong>$0 variance</strong>.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- BRIDGE -->
+  <section id="bridge" class="hide">
+    <div class="card full">
+      <h3>Quality of Earnings Bridge</h3><div class="cap">Reported net loss reconciled to Diligence Adjusted EBITDA · $ actuals</div>
+      <table>
+        <thead><tr><th>Line</th><th>Ref.</th><th>TTM Mar-25</th><th>TTM Mar-26</th></tr></thead>
+        <tbody>
+          <tr><td>Reported EBITDA</td><td></td><td>39,495</td><td>(10,017)</td></tr>
+          <tr class="adj"><td><span class="chip">A</span>Nonrecurring Expenses</td><td>A</td><td>44,825</td><td>41,217</td></tr>
+          <tr class="tot"><td>Seller Adjusted EBITDA</td><td></td><td>84,321</td><td>31,200</td></tr>
+          <tr class="adj"><td><span class="chip">B</span>DVM Compensation</td><td>B</td><td>180,191</td><td>188,262</td></tr>
+          <tr class="adj"><td><span class="chip">C</span>Proforma Insurance</td><td>C</td><td>0</td><td>0</td></tr>
+          <tr class="adj"><td><span class="chip">D</span>Rent Normalization</td><td>D</td><td>(14,276)</td><td>(189)</td></tr>
+          <tr class="adj"><td><span class="chip">E</span>Family on Payroll</td><td>E</td><td>9,065</td><td>8,397</td></tr>
+          <tr class="adj"><td><span class="chip">F</span>Non-recurring Legal Fees</td><td>F</td><td>(1,800)</td><td>9,075</td></tr>
+          <tr class="adj"><td><span class="chip">G</span>Loss on Disposal of Asset</td><td>G</td><td>25,053</td><td>0</td></tr>
+          <tr class="tot"><td>Diligence Adjusted EBITDA</td><td></td><td>282,553</td><td>236,745</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card full" style="margin-top:18px"><h3>Adjustment contribution — TTM Mar-26</h3><div class="cap">Which add-backs move the number</div><div id="cAdj"></div></div>
+  </section>
+
+  <!-- REVENUE -->
+  <section id="revenue" class="hide">
+    <div class="card full"><h3>Revenue &amp; Gross Profit</h3><div class="cap">TTM comparison · $ actuals</div><div id="cRev"></div></div>
+    <div class="grid" style="margin-top:18px">
+      <div class="card"><h3>Revenue</h3><table><tbody>
+        <tr><td>TTM Mar-25</td><td>$2,568,154</td></tr>
+        <tr><td>TTM Mar-26</td><td>$2,621,078</td></tr>
+        <tr class="tot"><td>Change</td><td>+$52,924 (2.1%)</td></tr></tbody></table></div>
+      <div class="card"><h3>Cost of Products / Gross Profit</h3><table><tbody>
+        <tr><td>COGS TTM Mar-26</td><td>$735,422</td></tr>
+        <tr><td>Gross Profit TTM Mar-26</td><td>$1,885,656</td></tr>
+        <tr class="tot"><td>Gross Margin</td><td>71.9% (was 74.5%)</td></tr></tbody></table></div>
+    </div>
+  </section>
+
+  <!-- SG&A -->
+  <section id="sga" class="hide">
+    <div class="card full"><h3>Adjusted Operating Expense Mix — TTM Mar-26</h3><div class="cap">Linked from the Adj FS tab</div><div id="cSga"></div></div>
+  </section>
+</main>
+
+<footer>
+  Prototype dashboard generated from <em>Databook DRAFT - Poolesville Vet Clinic_live.xlsx</em> · Armanino Transaction Advisory ·
+  Illustrative only — figures shown for concept demonstration.
+</footer>
+
+<script>
+/* Self-contained SVG charting — no external libraries, loads offline & inside SharePoint/Teams */
+const GOLD='#F4A831', OLIVE='#898A38', INK='#222222', NEG='#C0532B', GREY='#CFCEC4';
+const NS='http://www.w3.org/2000/svg';
+const el=(t,a)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);return e;};
+const money=v=>'$'+Math.round(v/1000)+'K';
+
+function frame(id,w,h,pad){
+  const box=document.getElementById(id);
+  const svg=el('svg',{viewBox:`0 0 ${w} ${h}`});
+  box.appendChild(svg);
+  return {svg,w,h,pad};
+}
+function text(svg,x,y,s,cls,anchor){const t=el('text',{x,y,class:cls||'tl','text-anchor':anchor||'middle'});t.textContent=s;svg.appendChild(t);}
+
+/* ---- Waterfall (floating bars): reported EBITDA -> adjusted ---- */
+function waterfall(){
+  const f=frame('cWaterfall',560,300,{l:48,r:12,t:16,b:52});
+  const {svg,w,h,pad}=f;
+  const steps=[
+    {l:'Reported',from:0,to:-10017,c:NEG},
+    {l:'A',from:-10017,to:31200,c:OLIVE},
+    {l:'B',from:31200,to:219462,c:OLIVE},
+    {l:'D',from:219462,to:219273,c:GREY},
+    {l:'E',from:219273,to:227670,c:OLIVE},
+    {l:'F',from:227670,to:236745,c:OLIVE},
+    {l:'Adj.',from:0,to:236745,c:GOLD}
+  ];
+  const min=-20000,max=250000;
+  const X=w-pad.l-pad.r, Y=h-pad.t-pad.b;
+  const sy=v=>pad.t+Y-((v-min)/(max-min))*Y;
+  // gridlines
+  for(let g=0;g<=5;g++){const v=min+(max-min)*g/5;const y=sy(v);
+    svg.appendChild(el('line',{x1:pad.l,y1:y,x2:w-pad.r,y2:y,class:'gl'}));
+    text(svg,pad.l-6,y+3,money(v),'vl','end');}
+  const bw=X/steps.length*0.62, gap=X/steps.length;
+  steps.forEach((s,i)=>{
+    const x=pad.l+gap*i+(gap-bw)/2;
+    const y1=sy(Math.max(s.from,s.to)), y2=sy(Math.min(s.from,s.to));
+    svg.appendChild(el('rect',{x,y:y1,width:bw,height:Math.max(2,y2-y1),rx:3,fill:s.c}));
+    text(svg,x+bw/2,h-pad.b+16,s.l,'tl');
+  });
+}
+
+/* ---- Line chart: gross margin trend ---- */
+function lineChart(){
+  const f=frame('cMargin',560,300,{l:40,r:12,t:16,b:40});
+  const {svg,w,h,pad}=f;
+  const months=['Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar'];
+  const val=[73.9,70.2,74.1,71.0,73.5,72.8,70.9,74.3,69.1,72.0,71.6,73.2];
+  const min=60,max=80, X=w-pad.l-pad.r, Y=h-pad.t-pad.b;
+  const sx=i=>pad.l+X*i/(months.length-1);
+  const sy=v=>pad.t+Y-((v-min)/(max-min))*Y;
+  for(let g=0;g<=4;g++){const v=min+(max-min)*g/4;const y=sy(v);
+    svg.appendChild(el('line',{x1:pad.l,y1:y,x2:w-pad.r,y2:y,class:'gl'}));
+    text(svg,pad.l-6,y+3,v+'%','vl','end');}
+  let d='';const area=[];
+  val.forEach((v,i)=>{d+=(i?'L':'M')+sx(i)+' '+sy(v)+' ';});
+  const areaPath=d+`L${sx(val.length-1)} ${sy(min)} L${sx(0)} ${sy(min)} Z`;
+  svg.appendChild(el('path',{d:areaPath,fill:'rgba(244,168,49,.14)',stroke:'none'}));
+  svg.appendChild(el('path',{d,fill:'none',stroke:GOLD,'stroke-width':2.5}));
+  val.forEach((v,i)=>{svg.appendChild(el('circle',{cx:sx(i),cy:sy(v),r:3,fill:OLIVE}));
+    text(svg,sx(i),h-pad.b+16,months[i],'tl');});
+}
+
+/* ---- Horizontal bars: adjustment contribution ---- */
+function hbars(){
+  const f=frame('cAdj',900,320,{l:130,r:40,t:10,b:30});
+  const {svg,w,h,pad}=f;
+  const rows=[['A Nonrecur.',41217],['B DVM Comp',188262],['C Insurance',0],['D Rent',-189],['E Family',8397],['F Legal',9075],['G Disposal',0]];
+  const max=200000,min=-20000, X=w-pad.l-pad.r, Y=h-pad.t-pad.b;
+  const sx=v=>pad.l+((v-min)/(max-min))*X;
+  const zero=sx(0);
+  const bh=Y/rows.length*0.6, gap=Y/rows.length;
+  for(let g=0;g<=5;g++){const v=min+(max-min)*g/5;const x=sx(v);
+    svg.appendChild(el('line',{x1:x,y1:pad.t,x2:x,y2:h-pad.b,class:'gl'}));
+    text(svg,x,h-pad.b+18,money(v),'vl');}
+  rows.forEach((r,i)=>{
+    const y=pad.t+gap*i+(gap-bh)/2;
+    const x=r[1]>=0?zero:sx(r[1]);
+    svg.appendChild(el('rect',{x,y,width:Math.max(2,Math.abs(sx(r[1])-zero)),height:bh,rx:3,fill:r[1]<0?NEG:OLIVE}));
+    text(svg,pad.l-8,y+bh/2+4,r[0],'tl','end');
+  });
+}
+
+/* ---- Grouped bars: revenue vs gross profit ---- */
+function groupedBars(){
+  const f=frame('cRev',900,320,{l:60,r:20,t:16,b:40});
+  const {svg,w,h,pad}=f;
+  const cats=['TTM Mar-25','TTM Mar-26'];
+  const rev=[2568154,2621078], gp=[1912001,1885656];
+  const max=2800000, X=w-pad.l-pad.r, Y=h-pad.t-pad.b;
+  const sy=v=>pad.t+Y-(v/max)*Y;
+  for(let g=0;g<=4;g++){const v=max*g/4;const y=sy(v);
+    svg.appendChild(el('line',{x1:pad.l,y1:y,x2:w-pad.r,y2:y,class:'gl'}));
+    text(svg,pad.l-6,y+3,'$'+(v/1000000).toFixed(1)+'M','vl','end');}
+  const gw=X/cats.length, bw=gw*0.3;
+  cats.forEach((c,i)=>{
+    const cx=pad.l+gw*i+gw/2;
+    svg.appendChild(el('rect',{x:cx-bw-4,y:sy(rev[i]),width:bw,height:Y-(sy(rev[i])-pad.t),rx:3,fill:INK}));
+    svg.appendChild(el('rect',{x:cx+4,y:sy(gp[i]),width:bw,height:Y-(sy(gp[i])-pad.t),rx:3,fill:GOLD}));
+    text(svg,cx,h-pad.b+18,c,'tl');
+  });
+  const lg=document.createElement('div');lg.className='legend';
+  lg.innerHTML='<span><i style="background:'+INK+'"></i>Revenue</span><span><i style="background:'+GOLD+'"></i>Gross Profit</span>';
+  document.getElementById('cRev').appendChild(lg);
+}
+
+/* ---- Donut: SG&A / opex mix ---- */
+function donut(){
+  const f=frame('cSga',900,340,{});
+  const {svg,w,h}=f;
+  const data=[['Labor - DVM',563795,INK],['Labor - Staff',621863,GOLD],['Labor & Fringe',181370,OLIVE],
+    ['Facility & Equip',143254,'#B8892F'],['Admin',88385,'#6B6B63'],['Fee/Collection',60779,'#A9A995'],
+    ['Marketing',22442,'#E7C77A'],['D&A',66388,GREY]];
+  const total=data.reduce((s,d)=>s+d[1],0);
+  const cx=200,cy=170,r=120,ir=64;
+  let a=-Math.PI/2;
+  data.forEach(d=>{
+    const ang=d[1]/total*Math.PI*2, a2=a+ang;
+    const x1=cx+r*Math.cos(a),y1=cy+r*Math.sin(a),x2=cx+r*Math.cos(a2),y2=cy+r*Math.sin(a2);
+    const xi1=cx+ir*Math.cos(a2),yi1=cy+ir*Math.sin(a2),xi2=cx+ir*Math.cos(a),yi2=cy+ir*Math.sin(a);
+    const large=ang>Math.PI?1:0;
+    const path=`M${x1} ${y1} A${r} ${r} 0 ${large} 1 ${x2} ${y2} L${xi1} ${yi1} A${ir} ${ir} 0 ${large} 0 ${xi2} ${yi2} Z`;
+    svg.appendChild(el('path',{d:path,fill:d[2]}));
+    a=a2;
+  });
+  // legend on right
+  data.forEach((d,i)=>{
+    const y=44+i*34;
+    svg.appendChild(el('rect',{x:430,y:y-11,width:13,height:13,rx:3,fill:d[2]}));
+    text(svg,452,y,d[0],'tl','start');
+    text(svg,880,y,money(d[1])+'  ('+(d[1]/total*100).toFixed(1)+'%)','vl','end');
+  });
+}
+
+waterfall();lineChart();hbars();groupedBars();donut();
+
+/* tab switching (runs after charts so SVG exists) */
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');
+  document.querySelectorAll('main section').forEach(s=>s.classList.add('hide'));
+  document.getElementById(b.dataset.tab).classList.remove('hide');
+});
+</script>
+</body>
+</html>
