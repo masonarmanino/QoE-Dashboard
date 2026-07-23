@@ -55,6 +55,15 @@
   footer{color:var(--muted);font-size:11px;text-align:center;padding:24px;}
   .legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:12px;font-size:12px;color:#444;}
   .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:middle;}
+  .sheet-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:18px;}
+  .metric-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:0 1px 3px rgba(0,0,0,.05);}
+  .metric-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;font-weight:700;}
+  .metric-value{font-size:24px;font-weight:700;color:var(--ink);line-height:1.1;}
+  .metric-note{font-size:12px;color:var(--muted);margin-top:8px;}
+  .metric-pair{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;font-size:13px;}
+  .metric-pair div{background:#f7f7f4;border-radius:10px;padding:10px;}
+  .metric-pair .pair-label{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;}
+  .metric-pair .pair-value{font-weight:700;color:var(--ink);}
   .upload-state{display:flex;justify-content:center;align-items:center;padding:48px 28px;min-height:60vh;}
   .upload-card{max-width:640px;text-align:center;}
   .upload-card h2{font-size:24px;margin-bottom:8px;}
@@ -116,6 +125,10 @@
     <button data-tab="bridge">EBITDA Bridge</button>
     <button data-tab="revenue">Revenue &amp; Margin</button>
     <button data-tab="sga">SG&amp;A</button>
+    <button data-tab="monthly-is">Monthly IS</button>
+    <button data-tab="ebitda-analysis">EBITDA Analysis</button>
+    <button data-tab="payroll">Payroll</button>
+    <button data-tab="common-size">Common Size</button>
   </nav>
 
   <main>
@@ -160,6 +173,26 @@
   <!-- SG&A -->
   <section id="sga" class="hide">
     <div class="card full"><h3>Adjusted Operating Expense Mix</h3><div class="cap">Linked from the Adj FS tab</div><div id="cSga"></div></div>
+  </section>
+
+  <!-- MONTHLY IS -->
+  <section id="monthly-is" class="hide">
+    <div class="card full"><h3>Monthly Income Statement</h3><div class="cap">TTM line items from the Monthly IS sheet.</div><div id="monthlyISContent"></div></div>
+  </section>
+
+  <!-- EBITDA ANALYSIS -->
+  <section id="ebitda-analysis" class="hide">
+    <div class="card full"><h3>EBITDA Analysis</h3><div class="cap">Bridge and percent-of-revenue line items from the EBITDA Analysis sheet.</div><div id="ebitdaAnalysisContent"></div></div>
+  </section>
+
+  <!-- PAYROLL -->
+  <section id="payroll" class="hide">
+    <div class="card full"><h3>Payroll Analysis</h3><div class="cap">Staff and owner compensation analysis from the Payroll Analysis sheet.</div><div id="payrollContent"></div></div>
+  </section>
+
+  <!-- COMMON SIZE -->
+  <section id="common-size" class="hide">
+    <div class="card full"><h3>Common Size Analysis</h3><div class="cap">Company and peer percentages from the Common Size Analysis sheet.</div><div id="commonSizeContent"></div></div>
   </section>
 </main>
 </div>
@@ -514,6 +547,188 @@ function renderRevenueTables(){
   `;
 }
 
+function lastNumericValue(row){
+  if (!Array.isArray(row)) return NaN;
+  for (let i = row.length - 1; i >= 0; i--){
+    const value = Number(row[i]);
+    if (Number.isFinite(value)) return value;
+  }
+  return NaN;
+}
+
+function lookupRowValue(sheetData, labels){
+  if (!sheetData || !Array.isArray(sheetData.rows)) return NaN;
+  const normalizedLabels = labels.map(label => normalizeKey(label));
+  const row = sheetData.rows.find(r => {
+    const label = normalizeKey(r[0] || '');
+    return normalizedLabels.some(n => label.includes(n));
+  });
+  return row ? lastNumericValue(row) : NaN;
+}
+
+function buildMetricCards(items){
+  const wrapper = document.createElement('div');
+  wrapper.className = 'sheet-summary';
+  items.forEach(item => {
+    const card = document.createElement('div');
+    card.className = 'metric-card';
+    const label = document.createElement('div');
+    label.className = 'metric-label';
+    label.textContent = item.label;
+    const value = document.createElement('div');
+    value.className = 'metric-value';
+    value.textContent = item.value;
+    card.appendChild(label);
+    card.appendChild(value);
+    if (item.note){
+      const note = document.createElement('div');
+      note.className = 'metric-note';
+      note.textContent = item.note;
+      card.appendChild(note);
+    }
+    wrapper.appendChild(card);
+  });
+  return wrapper;
+}
+
+function buildComparisonCards(items){
+  const wrapper = document.createElement('div');
+  wrapper.className = 'sheet-summary';
+  items.forEach(item => {
+    const card = document.createElement('div');
+    card.className = 'metric-card';
+    const label = document.createElement('div');
+    label.className = 'metric-label';
+    label.textContent = item.label;
+    card.appendChild(label);
+    const pair = document.createElement('div');
+    pair.className = 'metric-pair';
+    const first = document.createElement('div');
+    first.innerHTML = `<div class="pair-label">${item.firstLabel}</div><div class="pair-value">${item.firstValue}</div>`;
+    const second = document.createElement('div');
+    second.innerHTML = `<div class="pair-label">${item.secondLabel}</div><div class="pair-value">${item.secondValue}</div>`;
+    pair.appendChild(first);
+    pair.appendChild(second);
+    card.appendChild(pair);
+    wrapper.appendChild(card);
+  });
+  return wrapper;
+}
+
+function renderSheetSection(sectionId, containerId, sheetData, emptyMessage){
+  const container = document.getElementById(containerId);
+  if (!container){
+    showSectionMessage(sectionId, emptyMessage);
+    return;
+  }
+  container.innerHTML = '';
+  if (!sheetData){
+    showSectionMessage(sectionId, emptyMessage);
+    return;
+  }
+  const table = buildSheetTable(sheetData);
+  if (!table){
+    showSectionMessage(sectionId, emptyMessage);
+    return;
+  }
+  hideSectionMessage(sectionId);
+  container.appendChild(table);
+}
+
+function renderMonthlyIS(){
+  const sectionId = 'monthly-is';
+  const containerId = 'monthlyISContent';
+  const data = dashData.monthlyIS;
+  if (!data){
+    showSectionMessage(sectionId, 'Monthly IS data is unavailable.');
+    return;
+  }
+  hideSectionMessage(sectionId);
+  const metrics = [
+    {label:'Total Revenue', value: formatCurrency(lookupRowValue(data, ['total revenue', 'revenue']))},
+    {label:'Total Cost of Products', value: formatCurrency(lookupRowValue(data, ['total cost of products', 'cost of products']))},
+    {label:'Gross Profit', value: formatCurrency(lookupRowValue(data, ['gross profit']))},
+    {label:'Total Operating Expenses', value: formatCurrency(lookupRowValue(data, ['total operating expenses', 'operating expenses']))},
+    {label:'EBITDA', value: formatCurrency(lookupRowValue(data, ['ebitda']))},
+    {label:'Net Income', value: formatCurrency(lookupRowValue(data, ['net income']))}
+  ];
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  container.appendChild(buildMetricCards(metrics));
+}
+
+function renderEbitdaAnalysis(){
+  const sectionId = 'ebitda-analysis';
+  const containerId = 'ebitdaAnalysisContent';
+  const data = dashData.ebitdaAnalysis;
+  if (!data){
+    showSectionMessage(sectionId, 'EBITDA Analysis data is unavailable.');
+    return;
+  }
+  hideSectionMessage(sectionId);
+  const metrics = [
+    {label:'Reported EBITDA', value: formatCurrency(lookupRowValue(data, ['reported ebitda', 'reported ebitda']))},
+    {label:'Seller Adjusted EBITDA', value: formatCurrency(lookupRowValue(data, ['seller adjusted ebitda', 'seller adjusted ebitda']))},
+    {label:'Diligence Adjusted EBITDA', value: formatCurrency(lookupRowValue(data, ['diligence adjusted ebitda', 'diligence adjusted ebitda']))},
+    {label:'Implied Multiple', value: dashData.kpis && dashData.kpis.impliedMultiple && Number.isFinite(dashData.kpis.impliedMultiple.cyValue) ? dashData.kpis.impliedMultiple.cyValue.toFixed(1) + 'x' : '-'}
+  ];
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  container.appendChild(buildMetricCards(metrics));
+}
+
+function renderPayroll(){
+  const sectionId = 'payroll';
+  const containerId = 'payrollContent';
+  const data = dashData.payroll;
+  if (!data){
+    showSectionMessage(sectionId, 'Payroll Analysis data is unavailable.');
+    return;
+  }
+  hideSectionMessage(sectionId);
+  const metrics = [
+    {label:'Staff Wages', value: formatCurrency(lookupRowValue(data, ['staff wages', 'staff wages']))},
+    {label:'DVM Wages (as presented)', value: formatCurrency(lookupRowValue(data, ['dvm wages (as presented)', 'dvm wages']))},
+    {label:'DVM Wages (adjusted)', value: formatCurrency(lookupRowValue(data, ['dvm wages (adjusted)', 'dvm wages']))},
+    {label:'Go-Forward Owner Comp', value: formatCurrency(lookupRowValue(data, ['go-forward owner comp', 'go-forward owner comp']))}
+  ];
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  container.appendChild(buildMetricCards(metrics));
+}
+
+function renderCommonSize(){
+  const sectionId = 'common-size';
+  const containerId = 'commonSizeContent';
+  const data = dashData.commonSize;
+  if (!data){
+    showSectionMessage(sectionId, 'Common Size Analysis data is unavailable.');
+    return;
+  }
+  hideSectionMessage(sectionId);
+  const items = [];
+  const categories = ['labor - dvm', 'labor - staff', 'labor & fringe', 'facility & equip', 'admin', 'fee/collection', 'marketing'];
+  categories.forEach(cat => {
+    const row = data.rows.find(r => normalizeKey(r[0] || '').includes(cat));
+    if (row){
+      items.push({
+        label: row[0] || cat,
+        firstLabel: 'Company %',
+        firstValue: row[1] || '-',
+        secondLabel: 'Peer Avg %',
+        secondValue: row[2] || '-'
+      });
+    }
+  });
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  if (!items.length){
+    container.appendChild(buildSheetTable(data));
+    return;
+  }
+  container.appendChild(buildComparisonCards(items));
+}
+
 function renderDashboard(){
   // Central dashboard render path: update metrics, tables, and SVG charts.
   clearCharts();
@@ -521,6 +736,10 @@ function renderDashboard(){
   renderKeyFindings();
   renderBridgeTable();
   renderRevenueTables();
+  renderMonthlyIS();
+  renderEbitdaAnalysis();
+  renderPayroll();
+  renderCommonSize();
   updateTabVisibility();
   waterfall();
   lineChart();
@@ -633,6 +852,68 @@ function parseSectionByCols(rows, startIndex, colIndexes){
     section.push(row);
   }
   return section;
+}
+
+function parseSheetTable(sheet, headerPredicate){
+  if (!sheet) return null;
+  const rows = sheetToRows(sheet);
+  const headerIndex = rows.findIndex(headerPredicate);
+  if (headerIndex < 0) return null;
+  const headers = rows[headerIndex].map(cell => String(cell || '').trim());
+  const dataRows = [];
+  for (let i = headerIndex + 1; i < rows.length; i++){
+    const row = rows[i];
+    if (!Array.isArray(row) || row.every(cell => cell === undefined || cell === '')) break;
+    if (!row[0]) continue;
+    dataRows.push(row.map(cell => String(cell === undefined || cell === null ? '' : cell)));
+  }
+  return {headers, rows: dataRows};
+}
+
+function parseMonthlyIS(sheet){
+  return parseSheetTable(sheet, row => Array.isArray(row) && normalizeKey(row[0]) === 'account');
+}
+
+function parseEbitdaAnalysis(sheet){
+  return parseSheetTable(sheet, row => Array.isArray(row) && normalizeKey(row[0]) === 'line' && normalizeKey(row[1]) === 'ref');
+}
+
+function parsePayrollAnalysis(sheet){
+  return parseSheetTable(sheet, row => Array.isArray(row) && (normalizeKey(row[0]) === 'staff employees' || normalizeKey(row[0]) === 'owner / dvm'));
+}
+
+function parseCommonSizeAnalysis(sheet){
+  return parseSheetTable(sheet, row => Array.isArray(row) && normalizeKey(row[0]) === 'category' && row.some(cell => normalizeKey(cell).includes('company')));
+}
+
+function parseMarginSeriesSheet(sheet){
+  if (!sheet) return [];
+  const rows = sheetToRows(sheet);
+  const headerIndex = rows.findIndex(row => Array.isArray(row) && normalizeKey(row[0]) === 'month');
+  if (headerIndex < 0) return [];
+  const data = [];
+  for (let i = headerIndex + 1; i < rows.length; i++){
+    const row = rows[i];
+    if (!Array.isArray(row) || row.every(cell => cell === undefined || cell === '')) break;
+    if (!row[0]) continue;
+    data.push({month: String(row[0]).trim(), value: Number(row[1])});
+  }
+  return data;
+}
+
+function parseSgaAnalysisSheet(sheet){
+  if (!sheet) return [];
+  const rows = sheetToRows(sheet);
+  const headerIndex = rows.findIndex(row => Array.isArray(row) && normalizeKey(row[0]) === 'category');
+  if (headerIndex < 0) return [];
+  const data = [];
+  for (let i = headerIndex + 1; i < rows.length; i++){
+    const row = rows[i];
+    if (!Array.isArray(row) || row.every(cell => cell === undefined || cell === '')) break;
+    if (!row[0]) continue;
+    data.push({category: String(row[0]).trim(), adjustedValueCY: Number(row[2])});
+  }
+  return data;
 }
 
 function inferBridgeType(label){
@@ -754,6 +1035,49 @@ function parseDashFeed(sheet){
   return dashData;
 }
 
+function buildSheetTable(sheetData){
+  if (!sheetData || !Array.isArray(sheetData.rows) || sheetData.rows.length === 0) return null;
+  const table = document.createElement('table');
+  const thead = document.createElement('thead');
+  const trHead = document.createElement('tr');
+  sheetData.headers.forEach(header => {
+    const th = document.createElement('th');
+    th.textContent = header || '';
+    trHead.appendChild(th);
+  });
+  thead.appendChild(trHead);
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  sheetData.rows.forEach(row => {
+    const tr = document.createElement('tr');
+    row.forEach(cell => {
+      const td = document.createElement('td');
+      td.textContent = cell || '';
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  return table;
+}
+
+function renderSheetSection(sectionId, sheetData, emptyMessage){
+  const container = document.getElementById(sectionId);
+  container.innerHTML = '';
+  if (!sheetData){
+    showSectionMessage(sectionId, emptyMessage);
+    return;
+  }
+  const table = buildSheetTable(sheetData);
+  if (!table){
+    showSectionMessage(sectionId, emptyMessage);
+    return;
+  }
+  hideSectionMessage(sectionId);
+  container.appendChild(table);
+}
+
 function validate(dashData){
   const errors = [];
   if (!dashData || typeof dashData !== 'object') return ['Missing dashData object'];
@@ -817,10 +1141,20 @@ function handleFile(file){
       if (!workbook || !workbook.Sheets){
         throw new Error('Unable to read workbook structure.');
       }
-      const sheet = workbook.Sheets['DASH_FEED'];
-      if (!sheet) throw new Error('Workbook does not contain a sheet named DASH_FEED.');
-      dashData = parseDashFeed(sheet);
-      console.log('Parsed dashData from DASH_FEED:', dashData);
+      const dashFeedSheet = workbook.Sheets['DASH_FEED'];
+      if (!dashFeedSheet) throw new Error('Workbook does not contain a sheet named DASH_FEED.');
+      dashData = parseDashFeed(dashFeedSheet);
+      dashData.monthlyIS = parseMonthlyIS(workbook.Sheets['Monthly IS']);
+      dashData.ebitdaAnalysis = parseEbitdaAnalysis(workbook.Sheets['EBITDA Analysis']);
+      dashData.payroll = parsePayrollAnalysis(workbook.Sheets['Payroll Analysis']);
+      dashData.commonSize = parseCommonSizeAnalysis(workbook.Sheets['Common Size Analysis']);
+      if (!dashData.marginSeries || dashData.marginSeries.length === 0) {
+        dashData.marginSeries = parseMarginSeriesSheet(workbook.Sheets['Mthly Rev and Margin Trends']);
+      }
+      if (!dashData.sga || dashData.sga.length === 0) {
+        dashData.sga = parseSgaAnalysisSheet(workbook.Sheets['SG&A Analysis']);
+      }
+      console.log('Parsed dashData from DASH_FEED and extra sheets:', dashData);
       const errors = validate(dashData);
       if (errors.length){
         setUploadError('Workbook validation failed. Please confirm the DASH_FEED schema and fix these items: ' + errors.join('; '));
