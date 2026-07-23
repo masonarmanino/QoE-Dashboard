@@ -582,7 +582,7 @@ function sheetToRows(sheet){
   return rows.map(r => Array.isArray(r) ? r : [r]).map(r => r.map(v => v===undefined || v===null ? '' : v));
 }
 
-const SECTION_TAGS = new Set(['[meta]','[kpis]','[bridge]','[margin_series]','[sga_mix]','[key_findings]']);
+const SECTION_TAGS = new Set(['meta','kpis','bridge','revenuemargin','gross margin months','sg&a','key findings']);
 function isSectionTag(row){
   return Array.isArray(row) && SECTION_TAGS.has(normalizeKey(row[0]));
 }
@@ -592,6 +592,7 @@ function findSection(rows, marker){
 }
 
 function parseSection(rows, startIndex){
+  if (startIndex < 0) return [];
   const section = [];
   for (let i = startIndex + 1; i < rows.length; i++){
     const row = rows[i];
@@ -604,13 +605,22 @@ function parseSection(rows, startIndex){
 
 function inferBridgeType(label){
   const lower = normalizeKey(label);
-  if (lower.includes('reported ebitda')) return 'reported';
-  if (lower.includes('adjusted ebitda')) return 'subtotal';
+  if (lower.includes('reported')) return 'reported';
+  if (lower.includes('subtotal') || lower.includes('adjusted ebitda')) return 'subtotal';
   return 'adjustment';
 }
 
 function parseDashFeed(sheet){
   const rows = sheetToRows(sheet);
+  const sectionIndexes = {
+    meta: findSection(rows,'Meta'),
+    kpis: findSection(rows,'KPIs'),
+    bridge: findSection(rows,'Bridge'),
+    revenueMargin: findSection(rows,'RevenueMargin'),
+    grossMargin: findSection(rows,'Gross Margin Months'),
+    sga: findSection(rows,'SG&A'),
+    keyFindings: findSection(rows,'Key Findings')
+  };
   const dashData = {
     meta: {},
     kpis: {},
@@ -618,38 +628,35 @@ function parseDashFeed(sheet){
     revenue: {},
     marginSeries: [],
     sga: [],
-    keyFindings: []
+    keyFindings: [],
+    sections: sectionIndexes
   };
 
-  const metaRows = parseSection(rows, findSection(rows,'[META]'));
+  const metaRows = parseSection(rows, sectionIndexes.meta);
   metaRows.forEach(row => {
     const key = normalizeKey(row[0]);
     const value = row[1];
-    if (key === 'client_name') dashData.meta.clientName = String(value || '').trim();
-    if (key === 'period_py_label') dashData.meta.periodPY = String(value || '').trim();
-    if (key === 'period_cy_label') dashData.meta.periodCY = String(value || '').trim();
-    if (key === 'purchase_price') dashData.meta.purchasePrice = Number(value);
-    if (key === 'location') dashData.meta.location = String(value || '').trim();
+    if (key === 'client name') dashData.meta.clientName = String(value || '').trim();
+    if (key === 'period py') dashData.meta.periodPY = String(value || '').trim();
+    if (key === 'period cy') dashData.meta.periodCY = String(value || '').trim();
+    if (key === 'purchase price') dashData.meta.purchasePrice = Number(value);
   });
 
-  const kpiRows = parseSection(rows, findSection(rows,'[KPIS]'));
+  const kpiRows = parseSection(rows, findSection(rows,'KPIs'));
+  if (kpiRows.length && normalizeKey(kpiRows[0][0]) === 'metric') kpiRows.shift();
   kpiRows.forEach(row => {
-    const key = normalizeKey(row[0]);
-    const value = Number(row[1]);
-    if (!key) return;
-    if (key === 'revenue_py') dashData.kpis.revenue = {...dashData.kpis.revenue, pyValue: value};
-    if (key === 'revenue_cy') dashData.kpis.revenue = {...dashData.kpis.revenue, cyValue: value};
-    if (key === 'cogs_py') dashData.kpis.cogs = {...dashData.kpis.cogs, pyValue: value};
-    if (key === 'cogs_cy') dashData.kpis.cogs = {...dashData.kpis.cogs, cyValue: value};
-    if (key === 'adj_ebitda_py') dashData.kpis.diligenceAdjEbitda = {...dashData.kpis.diligenceAdjEbitda, pyValue: value};
-    if (key === 'adj_ebitda_cy') dashData.kpis.diligenceAdjEbitda = {...dashData.kpis.diligenceAdjEbitda, cyValue: value};
-    if (key === 'adj_margin_py') dashData.kpis.adjEbitdaMargin = {...dashData.kpis.adjEbitdaMargin, pyValue: value};
-    if (key === 'adj_margin_cy') dashData.kpis.adjEbitdaMargin = {...dashData.kpis.adjEbitdaMargin, cyValue: value};
-    if (key === 'implied_multiple_cy') dashData.kpis.impliedMultiple = {pyValue: NaN, cyValue: value};
+    const label = normalizeKey(row[0]);
+    const py = Number(row[1]);
+    const cy = Number(row[2]);
+    if (!label) return;
+    if (label === 'revenue') dashData.kpis.revenue = {pyValue: py, cyValue: cy};
+    if (label === 'diligence adj ebitda' || label === 'diligence adjusted ebitda') dashData.kpis.diligenceAdjEbitda = {pyValue: py, cyValue: cy};
+    if (label === 'adj ebitda margin' || label === 'adj. ebitda margin') dashData.kpis.adjEbitdaMargin = {pyValue: py, cyValue: cy};
+    if (label === 'implied multiple') dashData.kpis.impliedMultiple = {pyValue: py, cyValue: cy};
   });
 
-  const bridgeRows = parseSection(rows, findSection(rows,'[BRIDGE]'));
-  if (bridgeRows.length && normalizeKey(bridgeRows[0][0]) === 'line') bridgeRows.shift();
+  const bridgeRows = parseSection(rows, findSection(rows,'Bridge'));
+  if (bridgeRows.length && normalizeKey(bridgeRows[0][0]) === 'label') bridgeRows.shift();
   bridgeRows.forEach(row => {
     if (!row[0] || row.every(cell => cell === '')) return;
     dashData.bridge.push({
@@ -657,28 +664,40 @@ function parseDashFeed(sheet){
       ref: String(row[1] || '').trim(),
       pyValue: Number(row[2]),
       cyValue: Number(row[3]),
-      type: inferBridgeType(row[0])
+      type: String(row[4] || '').trim().toLowerCase() || inferBridgeType(row[0])
     });
   });
 
-  const marginRows = parseSection(rows, findSection(rows,'[MARGIN_SERIES]'));
+  const revenueRows = parseSection(rows, findSection(rows,'RevenueMargin'));
+  if (revenueRows.length && normalizeKey(revenueRows[0][0]) === 'metric') revenueRows.shift();
+  revenueRows.forEach(row => {
+    const label = normalizeKey(row[0]);
+    const py = Number(row[1]);
+    const cy = Number(row[2]);
+    if (!label) return;
+    if (label === 'revenue') dashData.revenue.revenue = {pyValue: py, cyValue: cy};
+    if (label === 'cogs') dashData.revenue.cogs = {pyValue: py, cyValue: cy};
+    if (label === 'gross profit') dashData.revenue.grossProfit = {pyValue: py, cyValue: cy};
+  });
+
+  const marginRows = parseSection(rows, findSection(rows,'Gross Margin Months'));
   if (marginRows.length && normalizeKey(marginRows[0][0]) === 'month') marginRows.shift();
   marginRows.forEach(row => {
     if (!row[0]) return;
     dashData.marginSeries.push({month: String(row[0]).trim(), value: Number(row[1])});
   });
 
-  const sgaRows = parseSection(rows, findSection(rows,'[SGA_MIX]'));
-  if (sgaRows.length && normalizeKey(sgaRows[0][3]) === 'category') sgaRows.shift();
+  const sgaRows = parseSection(rows, sectionIndexes.sga);
+  if (sgaRows.length && normalizeKey(sgaRows[0][0]) === 'category') sgaRows.shift();
   sgaRows.forEach(row => {
-    if (!row[3]) return;
-    dashData.sga.push({category: String(row[3]).trim(), adjustedValueCY: Number(row[4])});
+    if (!row[0]) return;
+    dashData.sga.push({category: String(row[0]).trim(), adjustedValueCY: Number(row[1])});
   });
 
-  const findingsRows = parseSection(rows, findSection(rows,'[KEY_FINDINGS]'));
+  const findingsRows = parseSection(rows, sectionIndexes.keyFindings);
   findingsRows.forEach(row => {
-    if (!row[0]) return;
-    dashData.keyFindings.push(String(row[0]).trim());
+    if (!row[1]) return;
+    dashData.keyFindings.push(String(row[1]).trim());
   });
 
   return dashData;
@@ -701,7 +720,8 @@ function validate(dashData){
   if (!kpis.adjEbitdaMargin || !Number.isFinite(kpis.adjEbitdaMargin.pyValue) || !Number.isFinite(kpis.adjEbitdaMargin.cyValue)) errors.push('KPIs.adjEbitdaMargin must include numeric PY and CY values');
   if (!kpis.impliedMultiple || !Number.isFinite(kpis.impliedMultiple.cyValue)) errors.push('KPIs.impliedMultiple must include numeric CY value');
 
-  if (!Array.isArray(dashData.bridge) || dashData.bridge.length === 0) errors.push('Bridge must include at least one row');
+  if (dashData.sections && dashData.sections.sga < 0) errors.push('SG&A section not found; expected a row with SG&A in column A');
+  if (!Array.isArray(dashData.sga) || dashData.sga.length === 0) errors.push('SG&A must include at least one row');
   else dashData.bridge.forEach((row,i)=>{
     if (!row.label) errors.push(`Bridge row ${i+1} missing label`);
     if (!Number.isFinite(row.pyValue)) errors.push(`Bridge row ${i+1} PY value must be numeric`);
