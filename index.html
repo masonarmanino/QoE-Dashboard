@@ -257,12 +257,18 @@ function parseNumericValue(value){
   if (value === null || value === undefined) return NaN;
   const raw = String(value).trim();
   if (!raw) return NaN;
-  const cleaned = raw.replace(/,/g, '').replace(/\s+/g, '');
+  let cleaned = raw.replace(/\$/g, '').replace(/,/g, '').replace(/\s+/g, '');
+  let negative = false;
+  if (cleaned.startsWith('(') && cleaned.endsWith(')')){
+    negative = true;
+    cleaned = cleaned.slice(1, -1);
+  }
   if (cleaned.endsWith('%')){
     const n = Number(cleaned.slice(0, -1));
-    return Number.isFinite(n) ? n / 100 : NaN;
+    return Number.isFinite(n) ? (negative ? -n / 100 : n / 100) : NaN;
   }
-  return Number(cleaned);
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? (negative ? -n : n) : NaN;
 }
 
 function frame(id,w,h,pad){
@@ -970,17 +976,24 @@ const SECTION_ALIASES = {
   revenueSeries: ['revenue series','[revenue series]','rev_series','[rev_series]'],
   reconciliations: ['reconciliations','[reconciliations]','reconciliation','[reconciliation]'],
   commonSize: ['common size','[common size]','common_size','[common_size]'],
-  sga: ['sg&a','[sg&a]','sg a','sga','[sga]','sga_mix','[sga_mix]'],
+  sga: ['sg&a','[sg&a]','sg a','sga','[sga]','sga_mix','[sga_mix]','sga mix','[sga mix]'],
   keyFindings: ['key findings','[key_findings]','key_findings']
 };
-const SECTION_TAGS = new Set(Object.values(SECTION_ALIASES).flat());
+const SECTION_TAGS = new Set(Object.values(SECTION_ALIASES).flat().map(normalizeKey));
+const SECTION_ALIAS_MAP = new Map();
+Object.entries(SECTION_ALIASES).forEach(([key, aliases]) => {
+  aliases.forEach(alias => SECTION_ALIAS_MAP.set(normalizeKey(alias), key));
+});
 function isSectionTag(row){
   return Array.isArray(row) && row.some(cell => SECTION_TAGS.has(normalizeKey(cell)));
 }
 
 function findSection(rows, marker){
   const normalizedMarker = normalizeKey(marker);
-  return rows.findIndex(r => Array.isArray(r) && r.some(cell => normalizeKey(cell) === normalizedMarker));
+  const canonicalMarker = SECTION_ALIAS_MAP.get(normalizedMarker) || marker;
+  const aliases = SECTION_ALIASES[canonicalMarker] || [marker];
+  const normalizedMarkers = aliases.map(normalizeKey);
+  return rows.findIndex(r => Array.isArray(r) && r.some(cell => normalizedMarkers.includes(normalizeKey(cell))));
 }
 
 function parseSection(rows, startIndex){
@@ -1041,6 +1054,21 @@ function parsePayrollAnalysis(sheet){
 
 function parseCommonSizeAnalysis(sheet){
   return parseSheetTable(sheet, row => Array.isArray(row) && normalizeKey(row[0]) === 'category' && row.some(cell => normalizeKey(cell).includes('company')));
+}
+
+function parseSgaAnalysisSheet(sheet){
+  if (!sheet) return [];
+  const rows = sheetToRows(sheet);
+  const headerIndex = rows.findIndex(row => Array.isArray(row) && normalizeKey(row[0]) === 'category');
+  if (headerIndex < 0) return [];
+  const data = [];
+  for (let i = headerIndex + 1; i < rows.length; i++){
+    const row = rows[i];
+    if (!Array.isArray(row) || row.every(cell => cell === undefined || cell === '')) break;
+    if (!row[0]) continue;
+    data.push({category: String(row[0]).trim(), adjustedValueCY: parseNumericValue(row[1])});
+  }
+  return data;
 }
 
 function parseMarginSeriesSheet(sheet){
@@ -1147,13 +1175,39 @@ function parseDashFeed(sheet){
   if (kpiRows.length && normalizeKey(kpiRows[0][0]) === 'metric') kpiRows.shift();
   kpiRows.forEach(row => {
     const key = normalizeKey(row[0]);
-    const value = Number(row[1]);
     if (!key) return;
-    if (key === 'revenue' || key === 'revenue_py') dashData.kpis.revenue = {...dashData.kpis.revenue, pyValue: parseNumericValue(row[1]), cyValue: parseNumericValue(row[2])};
-    if (key === 'cogs' || key === 'cogs_py') dashData.kpis.cogs = {...dashData.kpis.cogs, pyValue: parseNumericValue(row[1]), cyValue: parseNumericValue(row[2])};
-    if (key === 'diligence adj ebitda' || key === 'adj ebitda' || key === 'adj_ebitda_py') dashData.kpis.diligenceAdjEbitda = {...dashData.kpis.diligenceAdjEbitda, pyValue: parseNumericValue(row[1]), cyValue: parseNumericValue(row[2])};
-    if (key === 'adj ebitda margin' || key === 'adjusted ebitda margin' || key === 'adj_ebitda_margin_py') dashData.kpis.adjEbitdaMargin = {...dashData.kpis.adjEbitdaMargin, pyValue: parseNumericValue(row[1]), cyValue: parseNumericValue(row[2])};
-    if (key === 'implied multiple' || key === 'implied multiple cy') dashData.kpis.impliedMultiple = {pyValue: NaN, cyValue: parseNumericValue(row[2] !== undefined ? row[2] : row[1])};
+    const raw1 = row[1] !== undefined ? row[1] : '';
+    const raw2 = row[2] !== undefined ? row[2] : '';
+    const pyValue = parseNumericValue(raw1);
+    const cyValue = parseNumericValue(raw2);
+
+    if (['revenue','revenue py','revenue py label','revenue py label'].includes(key)) {
+      dashData.kpis.revenue = {...dashData.kpis.revenue, pyValue, cyValue};
+    }
+    if (['revenue cy','revenue cy label','revenue_cy'].includes(key)) {
+      dashData.kpis.revenue = {...dashData.kpis.revenue, cyValue: parseNumericValue(raw1)};
+    }
+    if (['cogs','cogs py','cogs py label','cogs_py'].includes(key)) {
+      dashData.kpis.cogs = {...dashData.kpis.cogs, pyValue, cyValue};
+    }
+    if (['cogs cy','cogs cy label','cogs_cy'].includes(key)) {
+      dashData.kpis.cogs = {...dashData.kpis.cogs, cyValue: parseNumericValue(raw1)};
+    }
+    if (['diligence adj ebitda','adj ebitda','adj ebitda py','adj_ebitda_py','adj_ebitda_py label'].includes(key)) {
+      dashData.kpis.diligenceAdjEbitda = {...dashData.kpis.diligenceAdjEbitda, pyValue, cyValue};
+    }
+    if (['diligence adj ebitda cy','adj ebitda cy','adj_ebitda_cy'].includes(key)) {
+      dashData.kpis.diligenceAdjEbitda = {...dashData.kpis.diligenceAdjEbitda, cyValue: parseNumericValue(raw1)};
+    }
+    if (['adj ebitda margin','adjusted ebitda margin','adj ebitda margin py','adj_ebitda_margin_py','adj margin py','adj_margin_py'].includes(key)) {
+      dashData.kpis.adjEbitdaMargin = {...dashData.kpis.adjEbitdaMargin, pyValue, cyValue};
+    }
+    if (['adj ebitda margin cy','adj_ebitda_margin_cy','adj margin cy','adj_margin_cy'].includes(key)) {
+      dashData.kpis.adjEbitdaMargin = {...dashData.kpis.adjEbitdaMargin, cyValue: parseNumericValue(raw1)};
+    }
+    if (['implied multiple','implied multiple cy','implied multiple cy label','implied_multiple_cy'].includes(key)) {
+      dashData.kpis.impliedMultiple = {pyValue: NaN, cyValue: parseNumericValue(raw1) || parseNumericValue(raw2)};
+    }
   });
 
   const bridgeRows = parseSection(rows, sectionIndexes.bridge);
@@ -1204,8 +1258,16 @@ function parseDashFeed(sheet){
   const sgaRows = parseSection(rows, sectionIndexes.sga);
   if (sgaRows.length && normalizeKey(sgaRows[0][0]) === 'category') sgaRows.shift();
   sgaRows.forEach(row => {
-    if (!row[0]) return;
-    dashData.sga.push({category: String(row[0]).trim(), adjustedValueCY: parseNumericValue(row[1])});
+    const candidateCategory = String(row[0] || '').trim();
+    const candidateAltCategory = String(row[3] || '').trim();
+    if (normalizeKey(candidateCategory) === 'month' && normalizeKey(candidateAltCategory) === 'category') return;
+    if (candidateAltCategory) {
+      if (!normalizeKey(candidateAltCategory)) return;
+      dashData.sga.push({category: candidateAltCategory, adjustedValueCY: parseNumericValue(row[4])});
+      return;
+    }
+    if (!candidateCategory) return;
+    dashData.sga.push({category: candidateCategory, adjustedValueCY: parseNumericValue(row[1])});
   });
 
   const findingsRows = parseSection(rows, sectionIndexes.keyFindings);
@@ -1294,10 +1356,10 @@ function validate(dashData){
     });
   }
 
-  if (dashData.sections && dashData.sections.revenueMargin < 0) {
+  if (dashData.sections && dashData.sections.revenueMargin < 0 && (!dashData.revenue.revenue || !dashData.revenue.cogs)) {
     errors.push('DASH_FEED section missing: RevenueMargin');
   }
-  if (!Array.isArray(dashData.revenue) || !dashData.revenue.revenue || !Number.isFinite(dashData.revenue.revenue.pyValue) || !Number.isFinite(dashData.revenue.revenue.cyValue)) {
+  if (!dashData.revenue.revenue || !Number.isFinite(dashData.revenue.revenue.pyValue) || !Number.isFinite(dashData.revenue.revenue.cyValue)) {
     errors.push('Revenue & Margin section must include numeric Revenue PY and CY values');
   }
   if (!dashData.revenue.cogs || !Number.isFinite(dashData.revenue.cogs.pyValue) || !Number.isFinite(dashData.revenue.cogs.cyValue)) {
@@ -1351,7 +1413,7 @@ function validate(dashData){
       if (!Number.isFinite(row.adjustedValueCY)) errors.push(`SG&A row ${row.category || i+1} has invalid CY Value`);
     });
   }
-  if (dashData.sections && dashData.sections.sga < 0) errors.push('DASH_FEED section missing: SG&A');
+  if (dashData.sections && dashData.sections.sga < 0 && (!dashData.sga || dashData.sga.length === 0)) errors.push('DASH_FEED section missing: SG&A');
 
   if (!Array.isArray(dashData.keyFindings) || dashData.keyFindings.length === 0) errors.push('Key Findings section must include at least one finding');
   if (dashData.sections && dashData.sections.keyFindings < 0) errors.push('DASH_FEED section missing: Key Findings');
