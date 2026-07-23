@@ -960,18 +960,19 @@ function sheetToRows(sheet){
   return parseSheetRows(sheet);
 }
 
-const SECTION_TAGS = new Set([
-  'meta','[meta]',
-  'kpis','[kpis]',
-  'bridge','[bridge]',
-  'revenuemargin','[revenuemargin]','revenue margin','[revenue margin]','revenue_margin','[revenue_margin]',
-  'gross margin months','[gross_margin_months]','gross_margin_months','[gross margin months]','gross margin months',
-  'revenue series','[revenue series]','rev_series','[rev_series]',
-  'reconciliations','[reconciliations]','reconciliation','[reconciliation]',
-  'common size','[common size]','common_size','[common_size]',
-  'sg&a','[sg&a]','sg a','sga','[sga]','sga_mix','[sga_mix]',
-  'key findings','[key_findings]','key_findings'
-]);
+const SECTION_ALIASES = {
+  meta: ['meta','[meta]'],
+  kpis: ['kpis','[kpis]'],
+  bridge: ['bridge','[bridge]'],
+  revenueMargin: ['revenuemargin','[revenuemargin]','revenue margin','[revenue margin]','revenue_margin','[revenue_margin]'],
+  marginSeries: ['gross margin months','[gross_margin_months]','gross_margin_months','[gross margin months]','gross margin months','margin series','[margin series]','[margin_series]','margin_series'],
+  revenueSeries: ['revenue series','[revenue series]','rev_series','[rev_series]'],
+  reconciliations: ['reconciliations','[reconciliations]','reconciliation','[reconciliation]'],
+  commonSize: ['common size','[common size]','common_size','[common_size]'],
+  sga: ['sg&a','[sg&a]','sg a','sga','[sga]','sga_mix','[sga_mix]'],
+  keyFindings: ['key findings','[key_findings]','key_findings']
+};
+const SECTION_TAGS = new Set(Object.values(SECTION_ALIASES).flat());
 function isSectionTag(row){
   return Array.isArray(row) && row.some(cell => SECTION_TAGS.has(normalizeKey(cell)));
 }
