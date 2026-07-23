@@ -729,6 +729,10 @@ let dashData = null;
 function handleFile(file){
   // Validate file type and parse the uploaded workbook into dashData.
   setUploadError('');
+  if (typeof XLSX === 'undefined'){
+    setUploadError('Vendor library vendor/xlsx.full.min.js is missing or empty. Please install the vendored SheetJS bundle before uploading.');
+    return;
+  }
   if (!file.name.toLowerCase().endsWith('.xlsx')){
     setUploadError('Please upload a valid .xlsx file containing a DASH_FEED worksheet.');
     return;
