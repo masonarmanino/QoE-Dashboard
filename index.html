@@ -55,6 +55,9 @@
   footer{color:var(--muted);font-size:11px;text-align:center;padding:24px;}
   .legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:12px;font-size:12px;color:#444;}
   .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:middle;}
+  .chart-tooltip{position:absolute;pointer-events:none;background:#222;color:#fff;padding:8px 10px;border-radius:10px;font-size:12px;line-height:1.3;white-space:nowrap;opacity:0;transition:opacity .18s ease,transform .18s ease;transform:translate(-50%,0);z-index:9999;}
+  svg .hoverable{cursor:pointer;transition:transform .15s ease,opacity .15s ease,filter .15s ease;}
+  svg .hoverable:hover{filter:drop-shadow(0 6px 12px rgba(0,0,0,.12));transform:translateY(-2px);opacity:.92;}
   .sheet-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:18px;}
   .metric-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:0 1px 3px rgba(0,0,0,.05);}
   .metric-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;font-weight:700;}
@@ -238,6 +241,30 @@
 const GOLD='#F4A831', OLIVE='#898A38', INK='#222222', NEG='#C0532B', GREY='#CFCEC4';
 const NS='http://www.w3.org/2000/svg';
 const el=(t,a)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);return e;};
+const chartTooltip = (() => {
+  const tip = document.createElement('div');
+  tip.className = 'chart-tooltip';
+  document.body.appendChild(tip);
+  return tip;
+})();
+function showChartTooltip(text,event){
+  if (!chartTooltip) return;
+  chartTooltip.textContent = text;
+  chartTooltip.style.opacity = '1';
+  chartTooltip.style.left = `${event.pageX}px`;
+  chartTooltip.style.top = `${event.pageY - 10}px`;
+}
+function hideChartTooltip(){
+  if (!chartTooltip) return;
+  chartTooltip.style.opacity = '0';
+}
+function bindHover(element,text){
+  if (!element) return;
+  element.classList.add('hoverable');
+  element.addEventListener('mouseenter', e => showChartTooltip(text, e));
+  element.addEventListener('mousemove', e => showChartTooltip(text, e));
+  element.addEventListener('mouseleave', hideChartTooltip);
+}
 
 // --- number formatting helpers ------------------------------------------------
 function formatCurrency(value){
@@ -371,7 +398,9 @@ function waterfall(){
     const x = pad.l + gap * i + (gap - bw) / 2;
     const y1 = sy(Math.max(s.from, s.to));
     const y2 = sy(Math.min(s.from, s.to));
-    svg.appendChild(el('rect',{x,y:y1,width:bw,height:Math.max(2,y2-y1),rx:3,fill:s.color}));
+    const bar = el('rect',{x,y:y1,width:bw,height:Math.max(2,y2-y1),rx:3,fill:s.color});
+    svg.appendChild(bar);
+    bindHover(bar, `${s.label}: ${formatCurrency(s.to)} (${s.from >= s.to ? 'decrease' : 'increase'})`);
     text(svg,x+bw/2,h-pad.b+16,s.label,'tl');
   });
 }
@@ -408,7 +437,9 @@ function lineChart(){
   series.forEach((row,i)=>{
     const x = sx(i);
     const y = sy(Number(row.value));
-    svg.appendChild(el('circle',{cx:x,cy:y,r:3,fill:OLIVE}));
+    const point = el('circle',{cx:x,cy:y,r:5,fill:OLIVE});
+    svg.appendChild(point);
+    bindHover(point, `${row.month}: ${formatPercent(row.value)}`);
     text(svg,x,h-pad.b+16,row.month,'tl');
   });
 }
@@ -437,7 +468,9 @@ function hbars(){
   rows.forEach((row,i)=>{
     const y = pad.t + gap * i + (gap - bh) / 2;
     const x = row.value >= 0 ? zero : sx(row.value);
-    svg.appendChild(el('rect',{x,y,width:Math.max(2,Math.abs(sx(row.value) - zero)),height:bh,rx:3,fill:row.value < 0 ? NEG : OLIVE}));
+    const bar = el('rect',{x,y,width:Math.max(2,Math.abs(sx(row.value) - zero)),height:bh,rx:3,fill:row.value < 0 ? NEG : OLIVE});
+    svg.appendChild(bar);
+    bindHover(bar, `${row.label}: ${formatCurrency(row.value)}`);
     text(svg,pad.l-8,y+bh/2+4,row.label,'tl','end');
   });
 }
@@ -486,7 +519,9 @@ function groupedBars(){
     const x = sx(i) - barWidth/2;
     const revenue = revenueSeries[i] ? Number(revenueSeries[i].value) : NaN;
     if (Number.isFinite(revenue)){
-      svg.appendChild(el('rect',{x,y:syRevenue(revenue),width:barWidth,height:Math.max(3,Y-(syRevenue(revenue)-pad.t)),rx:4,fill:INK}));
+      const bar = el('rect',{x,y:syRevenue(revenue),width:barWidth,height:Math.max(3,Y-(syRevenue(revenue)-pad.t)),rx:4,fill:INK});
+      svg.appendChild(bar);
+      bindHover(bar, `${label} revenue: ${formatCurrency(revenue)}`);
     }
     const margin = Number(months[i].value);
     if (Number.isFinite(margin)){
@@ -499,7 +534,9 @@ function groupedBars(){
           svg.appendChild(el('line',{x1:sx(i-1),y1:syMargin(prev),x2:cx,y2:cy,stroke:GOLD,'stroke-width':'2.5'}));
         }
       }
-      svg.appendChild(el('circle',{cx,cy,r:4,fill:OLIVE,stroke:'#fff','stroke-width':'1.5'}));
+      const point = el('circle',{cx,cy,r:5,fill:OLIVE,stroke:'#fff','stroke-width':'1.5'});
+      svg.appendChild(point);
+      bindHover(point, `${label} margin: ${formatPercent(margin)}`);
     }
     text(svg,sx(i),h-pad.b+18,label,'tl');
   });
@@ -536,7 +573,9 @@ function donut(){
     const xi2 = cx + ir * Math.cos(a), yi2 = cy + ir * Math.sin(a);
     const large = ang > Math.PI ? 1 : 0;
     const path = `M${x1} ${y1} A${r} ${r} 0 ${large} 1 ${x2} ${y2} L${xi1} ${yi1} A${ir} ${ir} 0 ${large} 0 ${xi2} ${yi2} Z`;
-    svg.appendChild(el('path',{d:path,fill:item.color}));
+    const slice = el('path',{d:path,fill:item.color});
+    svg.appendChild(slice);
+    bindHover(slice, `${item.label}: ${formatCurrency(item.value)} (${total ? (item.value/total*100).toFixed(1) : '0.0'}%)`);
     a = a2;
   });
   data.forEach((item,i) => {
